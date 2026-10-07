@@ -176,14 +176,14 @@
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header py-2">
-          <h5 class="modal-title fs-6">Input Pembayaran Pajak</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <h5 class="modal-title fs-6"><i class="fa-solid fa-receipt"></i> Input Pembayaran Pajak</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Selesai"></button>
         </div>
         <div class="modal-body">
           <form id="formBayar">
             
             <div class="mb-2">
-              <label class="form-label">Pilih Tahun Pembayaran</label>
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Pilih Tahun Pembayaran</label>
               <select id="inputPilihTahun" class="form-select form-select-sm fw-bold" onchange="handleTahunChange(this)" required>
                 <option value="">-- Pilih Tahun --</option>
               </select>
@@ -191,7 +191,7 @@
 
             <!-- Pilihan Wajib Pajak (Dropdown) -->
             <div class="mb-2">
-              <label class="form-label">Pilih Wajib Pajak</label>
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Pilih Wajib Pajak</label>
               <select id="dropdownPilihWP" class="form-select form-select-sm" onchange="handleWPChange(this)">
                 <option value="">-- Pilih Tahun Terlebih Dahulu --</option>
               </select>
@@ -199,8 +199,8 @@
 
             <!-- Tambahan Input Berdasarkan Isian NOP -->
             <div class="mb-2">
-              <label class="form-label mb-0" style="font-size: 0.75rem;"><i class="fa-solid fa-barcode"></i> Atau Masukkan / Ketik NOP Secara Manual</label>
-              <input type="text" id="inputManualNOP" class="form-control form-control-sm" placeholder="Ketik nomor NOP di sini..." onkeyup="handleManualNOPInput(this)">
+              <label class="form-label mb-0" style="font-size: 0.75rem;"><i class="fa-solid fa-barcode"></i> Atau Ketik NOP Secara Manual</label>
+              <input type="text" id="inputManualNOP" class="form-control form-control-sm" placeholder="Ketik nomor NOP..." onkeyup="handleManualNOPInput(this)">
               <div id="infoNamaWpManual" class="form-text text-primary fw-bold mt-1" style="font-size: 0.75rem; display: none;"></div>
             </div>
 
@@ -222,17 +222,22 @@
             </div>
 
             <div class="mb-2">
-              <label class="form-label">Jumlah Setoran (Rp)</label>
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Jumlah Setoran (Rp)</label>
               <input type="number" id="jumlahBayar" class="form-control form-control-sm" placeholder="Contoh: 150000" required>
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Tanggal Setoran</label>
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Tanggal Setoran</label>
               <input type="date" id="tglSetor" class="form-control form-control-sm" required>
             </div>
 
-            <div class="d-grid">
-              <button type="submit" class="btn btn-success btn-sm" id="btnSimpan">Simpan Pembayaran</button>
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-success btn-sm fw-bold" id="btnSimpan">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                Selesai Input (Tutup)
+              </button>
             </div>
           </form>
         </div>
@@ -517,7 +522,7 @@
       modalPass.show();
     }
 
-    // VERIFIKASI LOGIN MELALUI TABEL `password_operator` SUPABASE (TANPA EMAIL)
+    // VERIFIKASI LOGIN MELALUI TABEL `password_operator` SUPABASE
     document.getElementById('formAuthPassword').addEventListener('submit', async function(e) {
       e.preventDefault();
       let usernameInput = document.getElementById('inputUsernameAuth').value.trim();
@@ -552,7 +557,7 @@
       }
     });
 
-    // SIMPAN PEMBAYARAN KE SUPABASE
+    // SIMPAN PEMBAYARAN KE SUPABASE (MODAL TETAP TERBUKA UNTUK INPUT BANYAK DATA)
     document.getElementById('formBayar').addEventListener('submit', async function(e) {
       e.preventDefault();
       let tahunTagihan = Number(document.getElementById('inputPilihTahun').value);
@@ -575,7 +580,7 @@
       btn.innerText = 'Menyimpan...';
 
       try {
-        // Jika WP Baru, Insert ke tabel wajib_pajak
+        // 1. Jika WP Baru, Insert ke tabel wajib_pajak
         let formBaruVisible = document.getElementById('formWPBaru').style.display !== 'none';
         if (pilihanWP === 'BARU' || formBaruVisible) {
           const { error: errInsWP } = await supabaseClient.from('wajib_pajak').insert([
@@ -584,26 +589,42 @@
           if (errInsWP) throw errInsWP;
         }
 
-        // Insert ke tabel pembayaran_pajak
+        // 2. Insert ke tabel pembayaran_pajak
         const { error: errInsBayar } = await supabaseClient.from('pembayaran_pajak').insert([
           { nop: nopWP, tahun_tagihan: tahunTagihan, jumlah_bayar: jumlah, tanggal_setor: tanggal }
         ]);
         if (errInsBayar) throw errInsBayar;
 
-        alert("Data pembayaran & WP berhasil disimpan ke Supabase!");
-        bootstrap.Modal.getInstance(document.getElementById('modalInput')).hide();
+        // 3. Notifikasi Berhasil Ringkas
+        alert(`✅ Data pembayaran NOP ${nopWP} berhasil disimpan!`);
+
+        // 4. RESET FORM & PERSIAPAN INPUT SELANJUTNYA (MODAL TIDAK DITUTUP)
+        let lastTahun = document.getElementById('inputPilihTahun').value;
+        let lastTanggal = document.getElementById('tglSetor').value;
+
+        // Reset form
         document.getElementById('formBayar').reset();
-        document.getElementById('tglSetor').valueAsDate = new Date();
-        document.getElementById('dropdownPilihWP').innerHTML = '<option value="">-- Pilih Tahun Terlebih Dahulu --</option>';
+
+        // Kembalikan tanggal & tahun pilihan sebelumnya
+        document.getElementById('inputPilihTahun').value = lastTahun;
+        document.getElementById('tglSetor').value = lastTanggal;
+        
+        // Sembunyikan form tambahan
         document.getElementById('formWPBaru').style.display = 'none';
         document.getElementById('infoNamaWpManual').style.display = 'none';
         
-        loadData(); 
+        // Reload data Supabase & opsi WP
+        await loadData();
+        handleTahunChange(document.getElementById('inputPilihTahun'));
+
+        // Fokus kembali ke input NOP manual
+        document.getElementById('inputManualNOP').focus();
+
       } catch (err) {
-        alert("Gagal menyimpan data: " + err.message);
+        alert("❌ Gagal menyimpan data: " + err.message);
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Simpan Pembayaran';
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran';
       }
     });
   </script>
