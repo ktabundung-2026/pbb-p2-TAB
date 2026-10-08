@@ -1,1 +1,1 @@
-Aplikasi Monitoring PBB-P2 Desa Tapil Kecamatan Tabundung versi 1.0
+Aplikasi Monitoring PBB-P2 Kecamatan Tabundung versi 1.0
