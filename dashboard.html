@@ -272,61 +272,61 @@
       inputTahun.innerHTML = optionsInput;
     }
 
-    // LOAD DATA SESUAI DESA YANG SEDANG LOGIN
-    async function loadData() {
-      try {
-        // Filter data khusus desa operator di Supabase
-        const { data: wpList, error: errWP } = await supabaseClient
-          .from('wajib_pajak')
-          .select('*')
-          .eq('desa', activeDesa);
+  // LOAD DATA SECARA PARALEL & CEPAT
+  async function loadData() {
+  try {
+    // Jalankan query wajib_pajak dan pembayaran_pajak secara bersamaan
+    const [resWP, resBayar] = await Promise.all([
+      supabaseClient.from('wajib_pajak').select('*').eq('desa', activeDesa),
+      supabaseClient.from('pembayaran_pajak').select('*').eq('desa', activeDesa)
+    ]);
 
-        const { data: bayarList, error: errBayar } = await supabaseClient
-          .from('pembayaran_pajak')
-          .select('*')
-          .eq('desa', activeDesa);
+    if (resWP.error) throw resWP.error;
+    if (resBayar.error) throw resBayar.error;
 
-        if (errWP) throw errWP;
-        if (errBayar) throw errBayar;
+    const wpList = resWP.data || [];
+    const bayarList = resBayar.data || [];
 
-        let petaBayar = {};
-        bayarList.forEach(b => {
-          let key = `${String(b.nop).trim()}_${b.tahun_tagihan}`;
-          if (!petaBayar[key]) petaBayar[key] = { total: 0, tgl: '-' };
-          petaBayar[key].total += Number(b.jumlah_bayar) || 0;
-          if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
-        });
+    // Peta agregasi total pembayaran per NOP & Tahun
+    let petaBayar = {};
+    bayarList.forEach(b => {
+      let key = `${String(b.nop).trim()}_${b.tahun_tagihan}`;
+      if (!petaBayar[key]) petaBayar[key] = { total: 0, tgl: '-' };
+      petaBayar[key].total += Number(b.jumlah_bayar) || 0;
+      if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
+    });
 
-        globalData = wpList.map((wp, idx) => {
-          let nop = String(wp.nop).trim();
-          let key = `${nop}_${wp.tahun_tagihan}`;
-          let totalTagihan = Number(wp.total_tagihan) || 0;
-          let jumlahBayar = petaBayar[key] ? petaBayar[key].total : 0;
-          let tglSetor = petaBayar[key] ? petaBayar[key].tgl : '-';
-          let sisaTagihan = Math.max(0, totalTagihan - jumlahBayar);
-          
-          let status = "Belum Bayar";
-          if (totalTagihan === 0) status = "Penghapusan Pajak";
-          else if (jumlahBayar >= totalTagihan) status = "Lunas";
+    // Pemetaan data utama
+    globalData = wpList.map((wp, idx) => {
+      let nop = String(wp.nop).trim();
+      let key = `${nop}_${wp.tahun_tagihan}`;
+      let totalTagihan = Number(wp.total_tagihan) || 0;
+      let jumlahBayar = petaBayar[key] ? petaBayar[key].total : 0;
+      let tglSetor = petaBayar[key] ? petaBayar[key].tgl : '-';
+      let sisaTagihan = Math.max(0, totalTagihan - jumlahBayar);
+      
+      let status = "Belum Bayar";
+      if (totalTagihan === 0) status = "Penghapusan Pajak";
+      else if (jumlahBayar >= totalTagihan) status = "Lunas";
 
-          return {
-            no: idx + 1,
-            nop: nop,
-            nama: wp.nama,
-            tahunTagihan: String(wp.tahun_tagihan),
-            totalTagihan: totalTagihan,
-            jumlahBayar: jumlahBayar,
-            sisaTagihan: sisaTagihan,
-            tanggalSetor: tglSetor,
-            status: status
-          };
-        });
+      return {
+        no: idx + 1,
+        nop: nop,
+        nama: wp.nama,
+        tahunTagihan: String(wp.tahun_tagihan),
+        totalTagihan: totalTagihan,
+        jumlahBayar: jumlahBayar,
+        sisaTagihan: sisaTagihan,
+        tanggalSetor: tglSetor,
+        status: status
+      };
+    });
 
-        filterData();
-      } catch (err) {
-        alert("Gagal memuat data dari Supabase: " + err.message);
-      }
-    }
+    filterData();
+  } catch (err) {
+    alert("Gagal memuat data : " + err.message);
+  }
+}
 
     function updateDashboard(dataToSummarize, labelTahun) {
       let totalTagihan = 0;
