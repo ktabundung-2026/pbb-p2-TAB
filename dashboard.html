@@ -268,7 +268,6 @@
     let currentFilterStatus = 'Semua';
 
     window.onload = function() {
-      // Set Identitas Desa di Tampilan
       document.getElementById('textNamaDesaHeader').innerText = `${activeDesa} - Kecamatan Tabundung`;
       document.getElementById('textFooterDesa').innerText = activeDesa;
 
@@ -293,60 +292,52 @@
       inputTahun.innerHTML = optionsInput;
     }
 
-    // LOAD DATA SESUAI DESA YANG SEDANG LOGIN
+    // HELPER UNTUK AMBIL SELURUH DATA SUPABASE SECARA PARALEL (BYPASS LIMIT 1000)
+    async function fetchTableDataInParallel(tableName) {
+      let step = 1000;
+      // Ambil batch pertama
+      const { data: firstBatch, error: errFirst, count } = await supabaseClient
+        .from(tableName)
+        .select('*', { count: 'exact' })
+        .eq('desa', activeDesa)
+        .range(0, step - 1);
+
+      if (errFirst) throw errFirst;
+
+      let allRecords = [...(firstBatch || [])];
+      let totalRecords = count || allRecords.length;
+
+      // Jika total data melebihi 1000, ambil sisanya secara paralel bersamaan
+      if (totalRecords > step) {
+        let promises = [];
+        for (let rangeStart = step; rangeStart < totalRecords; rangeStart += step) {
+          promises.push(
+            supabaseClient
+              .from(tableName)
+              .select('*')
+              .eq('desa', activeDesa)
+              .range(rangeStart, rangeStart + step - 1)
+          );
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(res => {
+          if (res.error) throw res.error;
+          if (res.data) allRecords = allRecords.concat(res.data);
+        });
+      }
+
+      return allRecords;
+    }
+
+    // LOAD DATA DESA CEPAAAT & PARALEL
     async function loadData() {
       try {
-        let allWpList = [];
-        let allBayarList = [];
-        let step = 1000;
-        let fetchMore = true;
-        let rangeStart = 0;
-
-        // 1. Ambil data wajib_pajak secara bertahap
-        while (fetchMore) {
-          const { data, error } = await supabaseClient
-            .from('wajib_pajak')
-            .select('*')
-            .eq('desa', activeDesa)
-            .range(rangeStart, rangeStart + step - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allWpList = allWpList.concat(data);
-            if (data.length < step) {
-              fetchMore = false;
-            } else {
-              rangeStart += step;
-            }
-          } else {
-            fetchMore = false;
-          }
-        }
-
-        // 2. Ambil data pembayaran_pajak secara bertahap
-        fetchMore = true;
-        rangeStart = 0;
-        while (fetchMore) {
-          const { data, error } = await supabaseClient
-            .from('pembayaran_pajak')
-            .select('*')
-            .eq('desa', activeDesa)
-            .range(rangeStart, rangeStart + step - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allBayarList = allBayarList.concat(data);
-            if (data.length < step) {
-              fetchMore = false;
-            } else {
-              rangeStart += step;
-            }
-          } else {
-            fetchMore = false;
-          }
-        }
+        // Tarik tabel wajib_pajak dan pembayaran_pajak secara paralel
+        const [allWpList, allBayarList] = await Promise.all([
+          fetchTableDataInParallel('wajib_pajak'),
+          fetchTableDataInParallel('pembayaran_pajak')
+        ]);
 
         let petaBayar = {};
         allBayarList.forEach(b => {
@@ -356,7 +347,7 @@
           if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
         });
 
-        // Pelacak nomor urut per tahun
+        // Pelacak nomor urut reset per tahun
         let counterPerTahun = {};
 
         globalData = allWpList.map((wp) => {
@@ -410,7 +401,6 @@
         totalTagihan += Number(item.totalTagihan) || 0;
         totalBayar += Number(item.jumlahBayar) || 0;
 
-        // Penghitungan Kriteria WP
         if (item.status === 'Belum Bayar') countBelum++;
         else if (item.status === 'Lunas') countLunas++;
         else if (item.status === 'Penghapusan Pajak') countPenghapusan++;
@@ -420,7 +410,6 @@
       let persentase = totalTagihan > 0 ? ((totalBayar / totalTagihan) * 100).toFixed(1) : 0;
       let totalWP = dataToSummarize.length;
 
-      // Update Tampilan Keuangan
       document.getElementById('dashLabelTahun').innerText = labelTahun;
       document.getElementById('dashPersen').innerText = persentase + '%';
       document.getElementById('dashProgressBar').style.width = persentase + '%';
@@ -428,7 +417,6 @@
       document.getElementById('dashTotalBayar').innerText = 'Rp ' + totalBayar.toLocaleString();
       document.getElementById('dashTotalSisa').innerText = 'Rp ' + totalSisa.toLocaleString();
 
-      // Update Tampilan Jumlah WP per Kriteria
       document.getElementById('wpCountBelum').innerText = countBelum.toLocaleString() + ' WP';
       document.getElementById('wpCountLunas').innerText = countLunas.toLocaleString() + ' WP';
       document.getElementById('wpCountPenghapusan').innerText = countPenghapusan.toLocaleString() + ' WP';
@@ -502,4 +490,115 @@
 
       let filteredWP = globalData.filter(item => String(item.tahunTagihan) === tahunPilihan);
       
-      let options = '<option value="">-- Pilih
+      let options = '<option value="">-- Pilih Wajib Pajak --</option>';
+      options += `<option value="BARU" class="fw-bold text-primary">➕ [ + Tambah Wajib Pajak Baru ]</option>`;
+      
+      filteredWP.forEach(item => {
+        options += `<option value="${item.nop}" data-sisa="${item.sisaTagihan}">[NOP: ${item.nop}] - ${item.nama} (${item.status} | Sisa: Rp ${item.sisaTagihan.toLocaleString()})</option>`;
+      });
+      dropdownWP.innerHTML = options;
+    }
+
+    function handleWPChange(selectElement) {
+      let formBaru = document.getElementById('formWPBaru');
+      let inputJumlahBayar = document.getElementById('jumlahBayar');
+      let inputManualNOP = document.getElementById('inputManualNOP');
+      let infoNamaWpManual = document.getElementById('infoNamaWpManual');
+
+      if(selectElement.value !== "") {
+        inputManualNOP.value = "";
+        infoNamaWpManual.style.display = 'none';
+      }
+
+      if (selectElement.value === 'BARU') {
+        formBaru.style.display = 'block';
+        document.getElementById('inputNOPBaru').required = true;
+        document.getElementById('inputNamaBaru').required = true;
+        document.getElementById('inputTagihanBaru').required = true;
+        inputJumlahBayar.value = '';
+      } else {
+        formBaru.style.display = 'none';
+        document.getElementById('inputNOPBaru').required = false;
+        document.getElementById('inputNamaBaru').required = false;
+        document.getElementById('inputTagihanBaru').required = false;
+
+        let selectedOption = selectElement.options[selectElement.selectedIndex];
+        let sisaTagihan = selectedOption.getAttribute('data-sisa');
+        if (sisaTagihan !== null) {
+          inputJumlahBayar.value = sisaTagihan;
+        } else {
+          inputJumlahBayar.value = '';
+        }
+      }
+    }
+
+    function handleManualNOPInput(inputElement) {
+      let manualNop = inputElement.value.trim();
+      let dropdownWP = document.getElementById('dropdownPilihWP');
+      let formBaru = document.getElementById('formWPBaru');
+      let inputJumlahBayar = document.getElementById('jumlahBayar');
+      let infoNamaWpManual = document.getElementById('infoNamaWpManual');
+      let tahunPilihan = document.getElementById('inputPilihTahun').value;
+
+      if (manualNop.length > 0) {
+        dropdownWP.value = "";
+        formBaru.style.display = 'none';
+
+        let found = globalData.find(item => String(item.nop).trim().toLowerCase() === manualNop.toLowerCase() && String(item.tahunTagihan) === tahunPilihan);
+        
+        if (found) {
+          inputJumlahBayar.value = found.sisaTagihan;
+          infoNamaWpManual.innerHTML = `Nama WP: ${found.nama} | <span class="text-dark">Tagihan: Rp ${Number(found.totalTagihan).toLocaleString()}</span>`;
+          infoNamaWpManual.style.display = 'block';
+        } else {
+          infoNamaWpManual.style.display = 'none';
+          formBaru.style.display = 'block';
+          document.getElementById('inputNOPBaru').value = manualNop;
+          document.getElementById('inputNOPBaru').required = true;
+          document.getElementById('inputNamaBaru').required = true;
+          document.getElementById('inputTagihanBaru').required = true;
+          inputJumlahBayar.value = '';
+        }
+      } else {
+        infoNamaWpManual.style.display = 'none';
+        formBaru.style.display = 'none';
+        inputJumlahBayar.value = '';
+      }
+    }
+
+    function filterData() {
+      let keyword = document.getElementById('searchBox').value.toLowerCase();
+      let selectedYear = document.getElementById('filterTahun').value;
+      
+      let dataByYear = globalData.filter(item => {
+        return (selectedYear === 'Semua') || (String(item.tahunTagihan) === selectedYear);
+      });
+
+      updateDashboard(dataByYear, selectedYear === 'Semua' ? 'Semua Tahun' : 'Tahun ' + selectedYear);
+
+      let filteredFinal = dataByYear.filter(item => {
+        let matchKeyword = String(item.nop).toLowerCase().includes(keyword) || 
+                           item.nama.toLowerCase().includes(keyword) ||
+                           String(item.tahunTagihan).toLowerCase().includes(keyword) ||
+                           String(item.no).toLowerCase().includes(keyword);
+        
+        let matchStatus = (currentFilterStatus === 'Semua') || (item.status === currentFilterStatus);
+
+        return matchKeyword && matchStatus;
+      });
+
+      renderList(filteredFinal);
+    }
+
+    function bukaModalInput() {
+      document.getElementById('formBayar').reset();
+      document.getElementById('formWPBaru').style.display = 'none';
+      document.getElementById('infoNamaWpManual').style.display = 'none';
+      document.getElementById('tglSetor').valueAsDate = new Date();
+      let modal = new bootstrap.Modal(document.getElementById('modalInput'));
+      modal.show();
+    }
+
+    function logoutOperator() {
+      if (confirm("Apakah Anda yakin ingin keluar dari portal operator?")) {
+        sessionStorage.clear
