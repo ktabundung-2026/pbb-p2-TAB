@@ -292,10 +292,9 @@
       inputTahun.innerHTML = optionsInput;
     }
 
-    // HELPER UNTUK AMBIL SELURUH DATA SUPABASE SECARA PARALEL (BYPASS LIMIT 1000)
+    // HELPER: AMBIL DATA SUPABASE SECARA PARALEL KILAT (BYPASS LIMIT 1000)
     async function fetchTableDataInParallel(tableName) {
       let step = 1000;
-      // Ambil batch pertama
       const { data: firstBatch, error: errFirst, count } = await supabaseClient
         .from(tableName)
         .select('*', { count: 'exact' })
@@ -307,7 +306,6 @@
       let allRecords = [...(firstBatch || [])];
       let totalRecords = count || allRecords.length;
 
-      // Jika total data melebihi 1000, ambil sisanya secara paralel bersamaan
       if (totalRecords > step) {
         let promises = [];
         for (let rangeStart = step; rangeStart < totalRecords; rangeStart += step) {
@@ -330,10 +328,9 @@
       return allRecords;
     }
 
-    // LOAD DATA DESA CEPAAAT & PARALEL
+    // LOAD DATA DESA PARALEL (OPTIMAL & CEPAT)
     async function loadData() {
       try {
-        // Tarik tabel wajib_pajak dan pembayaran_pajak secara paralel
         const [allWpList, allBayarList] = await Promise.all([
           fetchTableDataInParallel('wajib_pajak'),
           fetchTableDataInParallel('pembayaran_pajak')
@@ -347,7 +344,6 @@
           if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
         });
 
-        // Pelacak nomor urut reset per tahun
         let counterPerTahun = {};
 
         globalData = allWpList.map((wp) => {
@@ -601,4 +597,82 @@
 
     function logoutOperator() {
       if (confirm("Apakah Anda yakin ingin keluar dari portal operator?")) {
-        sessionStorage.clear
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      }
+    }
+
+    // SIMPAN PEMBAYARAN DENGAN ATRIBUT DESA OPERATOR
+    document.getElementById('formBayar').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      let tahunTagihan = Number(document.getElementById('inputPilihTahun').value);
+      let pilihanWP = document.getElementById('dropdownPilihWP').value;
+      let manualNOP = document.getElementById('inputManualNOP').value.trim();
+      let jumlah = Number(document.getElementById('jumlahBayar').value);
+      let tanggal = document.getElementById('tglSetor').value;
+      
+      let nopWP = manualNOP || (pilihanWP !== 'BARU' ? pilihanWP : document.getElementById('inputNOPBaru').value.trim());
+      let namaWP = document.getElementById('inputNamaBaru').value.trim();
+      let totalTagihanBaru = Number(document.getElementById('inputTagihanBaru').value);
+
+      let btn = document.getElementById('btnSimpan');
+      if(!tahunTagihan || !nopWP) {
+        alert("Silakan lengkapi data formulir terlebih dahulu.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+
+      try {
+        let formBaruVisible = document.getElementById('formWPBaru').style.display !== 'none';
+        if (pilihanWP === 'BARU' || formBaruVisible) {
+          const { error: errInsWP } = await supabaseClient.from('wajib_pajak').insert([
+            { 
+              nop: nopWP, 
+              nama: namaWP, 
+              tahun_tagihan: tahunTagihan, 
+              total_tagihan: totalTagihanBaru,
+              desa: activeDesa 
+            }
+          ]);
+          if (errInsWP) throw errInsWP;
+        }
+
+        const { error: errInsBayar } = await supabaseClient.from('pembayaran_pajak').insert([
+          { 
+            nop: nopWP, 
+            tahun_tagihan: tahunTagihan, 
+            jumlah_bayar: jumlah, 
+            tanggal_setor: tanggal,
+            desa: activeDesa 
+          }
+        ]);
+        if (errInsBayar) throw errInsBayar;
+
+        alert(`✅ Data pembayaran NOP ${nopWP} (${activeDesa}) berhasil disimpan!`);
+
+        let lastTahun = document.getElementById('inputPilihTahun').value;
+        let lastTanggal = document.getElementById('tglSetor').value;
+
+        document.getElementById('formBayar').reset();
+        document.getElementById('inputPilihTahun').value = lastTahun;
+        document.getElementById('tglSetor').value = lastTanggal;
+        
+        document.getElementById('formWPBaru').style.display = 'none';
+        document.getElementById('infoNamaWpManual').style.display = 'none';
+        
+        await loadData();
+        handleTahunChange(document.getElementById('inputPilihTahun'));
+        document.getElementById('inputManualNOP').focus();
+
+      } catch (err) {
+        alert("❌ Gagal menyimpan data: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran';
+      }
+    });
+  </script>
+</body>
+</html>
