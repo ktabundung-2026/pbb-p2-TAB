@@ -50,7 +50,6 @@
         <h4 class="mb-0 fw-bold text-primary">Monitoring Pajak PBB-P2</h4>
       </div>
       <h6 class="fw-bold text-dark mb-1" id="textNamaDesaHeader">Desa - Kecamatan Tabundung</h6>
-      <span class="badge bg-secondary mb-2" id="textUsernameOperator">Operator: -</span>
       <p class="text-muted mb-0" style="font-size: 0.75rem;">
         Sistem Informasi Pemantauan Realisasi Setoran Pajak Bumi dan Bangunan Perdesaan dan Perkotaan (PBB-P2).
       </p>
@@ -249,7 +248,6 @@
     window.onload = function() {
       // Set Identitas Desa di Tampilan
       document.getElementById('textNamaDesaHeader').innerText = `${activeDesa} - Kecamatan Tabundung`;
-      document.getElementById('textUsernameOperator').innerText = `Operator: ${activeUsername || 'Aktif'}`;
       document.getElementById('textFooterDesa').innerText = activeDesa;
 
       generateYearDropdowns();
