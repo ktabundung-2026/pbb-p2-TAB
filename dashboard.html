@@ -234,7 +234,7 @@
 
     if (!activeDesa) {
       alert("Anda harus login terlebih dahulu!");
-      window.location.href = 'login.html';
+      window.location.href = 'index.html';
     }
 
     // --- KREDENSIAL SUPABASE ---
@@ -271,7 +271,7 @@
       inputTahun.innerHTML = optionsInput;
     }
 
-    // LOAD DATA SESUAI DESA YANG SEDANG LOGIN (Bypass limit 1000 Supabase)
+    // LOAD DATA SESUAI DESA YANG SEDANG LOGIN (Bypass limit 1000 & Reset Nomor Urut per Tahun)
     async function loadData() {
       try {
         let allWpList = [];
@@ -334,9 +334,13 @@
           if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
         });
 
-        globalData = allWpList.map((wp, idx) => {
+        // Objek pelacak nomor urut per tahun
+        let counterPerTahun = {};
+
+        globalData = allWpList.map((wp) => {
           let nop = String(wp.nop).trim();
-          let key = `${nop}_${wp.tahun_tagihan}`;
+          let tahunStr = String(wp.tahun_tagihan);
+          let key = `${nop}_${tahunStr}`;
           let totalTagihan = Number(wp.total_tagihan) || 0;
           let jumlahBayar = petaBayar[key] ? petaBayar[key].total : 0;
           let tglSetor = petaBayar[key] ? petaBayar[key].tgl : '-';
@@ -346,11 +350,18 @@
           if (totalTagihan === 0) status = "Penghapusan Pajak";
           else if (jumlahBayar >= totalTagihan) status = "Lunas";
 
+          // Inisialisasi atau increment nomor urut per tahun
+          if (!counterPerTahun[tahunStr]) {
+            counterPerTahun[tahunStr] = 1;
+          } else {
+            counterPerTahun[tahunStr]++;
+          }
+
           return {
-            no: idx + 1,
+            no: counterPerTahun[tahunStr], // Nomor urut reset jadi 1 per tahun
             nop: nop,
             nama: wp.nama,
-            tahunTagihan: String(wp.tahun_tagihan),
+            tahunTagihan: tahunStr,
             totalTagihan: totalTagihan,
             jumlahBayar: jumlahBayar,
             sisaTagihan: sisaTagihan,
@@ -364,6 +375,7 @@
         alert("Gagal memuat data : " + err.message);
       }
     }
+
     function updateDashboard(dataToSummarize, labelTahun) {
       let totalTagihan = 0;
       let totalBayar = 0;
