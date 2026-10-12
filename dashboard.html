@@ -271,32 +271,70 @@
       inputTahun.innerHTML = optionsInput;
     }
 
-    // LOAD DATA SESUAI DESA YANG SEDANG LOGIN
+    // LOAD DATA SESUAI DESA YANG SEDANG LOGIN (Bypass limit 1000 Supabase)
     async function loadData() {
       try {
-        // Filter data khusus desa operator di Supabase
-        const { data: wpList, error: errWP } = await supabaseClient
-          .from('wajib_pajak')
-          .select('*')
-          .eq('desa', activeDesa);
+        let allWpList = [];
+        let allBayarList = [];
+        let step = 1000;
+        let fetchMore = true;
+        let rangeStart = 0;
 
-        const { data: bayarList, error: errBayar } = await supabaseClient
-          .from('pembayaran_pajak')
-          .select('*')
-          .eq('desa', activeDesa);
+        // 1. Ambil data wajib_pajak secara bertahap
+        while (fetchMore) {
+          const { data, error } = await supabaseClient
+            .from('wajib_pajak')
+            .select('*')
+            .eq('desa', activeDesa)
+            .range(rangeStart, rangeStart + step - 1);
 
-        if (errWP) throw errWP;
-        if (errBayar) throw errBayar;
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allWpList = allWpList.concat(data);
+            if (data.length < step) {
+              fetchMore = false;
+            } else {
+              rangeStart += step;
+            }
+          } else {
+            fetchMore = false;
+          }
+        }
+
+        // 2. Ambil data pembayaran_pajak secara bertahap
+        fetchMore = true;
+        rangeStart = 0;
+        while (fetchMore) {
+          const { data, error } = await supabaseClient
+            .from('pembayaran_pajak')
+            .select('*')
+            .eq('desa', activeDesa)
+            .range(rangeStart, rangeStart + step - 1);
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            allBayarList = allBayarList.concat(data);
+            if (data.length < step) {
+              fetchMore = false;
+            } else {
+              rangeStart += step;
+            }
+          } else {
+            fetchMore = false;
+          }
+        }
 
         let petaBayar = {};
-        bayarList.forEach(b => {
+        allBayarList.forEach(b => {
           let key = `${String(b.nop).trim()}_${b.tahun_tagihan}`;
           if (!petaBayar[key]) petaBayar[key] = { total: 0, tgl: '-' };
           petaBayar[key].total += Number(b.jumlah_bayar) || 0;
           if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
         });
 
-        globalData = wpList.map((wp, idx) => {
+        globalData = allWpList.map((wp, idx) => {
           let nop = String(wp.nop).trim();
           let key = `${nop}_${wp.tahun_tagihan}`;
           let totalTagihan = Number(wp.total_tagihan) || 0;
@@ -326,7 +364,6 @@
         alert("Gagal memuat data : " + err.message);
       }
     }
-
     function updateDashboard(dataToSummarize, labelTahun) {
       let totalTagihan = 0;
       let totalBayar = 0;
