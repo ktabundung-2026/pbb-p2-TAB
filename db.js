@@ -1,20 +1,24 @@
-// ==========================================
-// 1. Inisialisasi Database Lokal (IndexedDB)
-// ==========================================
+// ============================================================================
+// 1. INISIALISASI DATABASE LOKAL (IndexedDB via Dexie.js)
+// ============================================================================
 const db = new Dexie("PbbP2LocalDB");
 
-// Definisi skema tabel lokal
+// Definisi skema tabel IndexedDB lokal
 db.version(1).stores({
   wajibPajak: "++id_lokal, nop, nama, tahun_tagihan, total_tagihan, desa",
-  antreanInput: "++id, nop, nama, tahun_tagihan, total_tagihan, desa, status",
-  operator: "id, desa, username, password" // Menggunakan struktur password_operator
+  pembayaranPajak: "++id_lokal, nop, tahun_tagihan, jumlah_bayar, tanggal_setor, desa",
+  antreanInput: "++id, tipe, nop, nama, tahun_tagihan, total_tagihan, jumlah_bayar, tanggal_setor, desa, status",
+  operator: "id, desa, username, password" // Cache akun operator dari password_operator
 });
 
-// ==========================================
-// 2. Modul Autentikasi & Akun Operator
-// ==========================================
+// ============================================================================
+// 2. MODUL AUTENTIKASI & AKUN OPERATOR (HYBRID ONLINE / OFFLINE)
+// ============================================================================
 
-// Unduh/Sinkronkan data operator dari Database Utama ke IndexedDB (Jalankan saat Online)
+/**
+ * Mengunduh data operator dari Database Utama ke IndexedDB lokal.
+ * Hanya dijalankan saat ada koneksi internet.
+ */
 async function syncOperatorLokal() {
   if (navigator.onLine && typeof supabaseClient !== 'undefined') {
     try {
@@ -27,29 +31,34 @@ async function syncOperatorLokal() {
       if (data && data.length > 0) {
         await db.operator.clear();
         await db.operator.bulkAdd(data);
-        console.log("✅ Data operator berhasil diperbarui untuk penggunaan offline.");
+        console.log("✅ Data akun operator berhasil diperbarui untuk penggunaan offline.");
       }
     } catch (err) {
-      console.warn("⚠️ Gagal mengunduh data operator ke lokal:", err.message);
+      console.warn("⚠️ Gagal mengunduh data operator ke lokal (Offline Mode):", err.message);
     }
   }
 }
 
-// Verifikasi Login (Mendukung Online & Offline)
+/**
+ * Memeriksa login operator secara hybrid (Lokal/IndexedDB dulu, lalu Database Utama if needed).
+ */
 async function verifikasiLoginOperator(desaPilihan, usernameInput, passwordInput) {
-  // A. Cek pencocokan dari Database Lokal terlebih dahulu
-  const operatorLokal = await db.operator
-    .where({ desa: desaPilihan, username: usernameInput, password: passwordInput })
-    .first();
+  // A. Cek kecocokan di IndexedDB lokal terlebih dahulu (Bisa bekerja baik Online maupun Offline)
+  try {
+    const operatorLokal = await db.operator
+      .where({ desa: desaPilihan, username: usernameInput, password: passwordInput })
+      .first();
 
-  if (operatorLokal) {
-    // Simpan sesi ke LocalStorage (tahan lama meski browser ditutup/offline)
-    localStorage.setItem('operator_desa', operatorLokal.desa);
-    localStorage.setItem('operator_username', operatorLokal.username);
-    return { success: true, data: operatorLokal, mode: 'lokal' };
+    if (operatorLokal) {
+      localStorage.setItem('operator_desa', operatorLokal.desa);
+      localStorage.setItem('operator_username', operatorLokal.username);
+      return { success: true, data: operatorLokal, mode: 'lokal' };
+    }
+  } catch (e) {
+    console.warn("Mengecek kredensial lokal gagal, mencoba koneksi utama...", e);
   }
 
-  // B. Jika tidak ada di lokal dan sedang ONLINE, cek langsung ke Database Utama
+  // B. Jika tidak ditemukan di lokal dan dalam posisi ONLINE, coba ke Database Utama
   if (navigator.onLine && typeof supabaseClient !== 'undefined') {
     try {
       const { data, error } = await supabaseClient
@@ -66,20 +75,20 @@ async function verifikasiLoginOperator(desaPilihan, usernameInput, passwordInput
         localStorage.setItem('operator_desa', data.desa);
         localStorage.setItem('operator_username', data.username);
         
-        // Perbarui cache lokal agar login berikutnya bisa offline
+        // Simpan/Perbarui cache lokal agar login berikutnya bisa offline
         await syncOperatorLokal();
         return { success: true, data: data, mode: 'online' };
       }
     } catch (err) {
-      return { success: false, message: "Terjadi kesalahan sistem: " + err.message };
+      return { success: false, message: "Gagal terhubung ke Database: " + err.message };
     }
   }
 
-  // C. Jika gagal atau dalam keadaan offline tanpa cache
+  // C. Jika gagal dan sedang Offline
   if (!navigator.onLine) {
     return { 
       success: false, 
-      message: `❌ Mode Offline:\nData akun untuk ${usernameInput} (${desaPilihan}) belum tersimpan di perangkat ini. Hubungkan ke internet untuk login pertama kali.` 
+      message: `❌ Mode Offline:\nAkun ${usernameInput} (${desaPilihan}) belum tersimpan di perangkat ini. Hubungkan internet untuk login pertama kali.` 
     };
   }
 
@@ -89,7 +98,9 @@ async function verifikasiLoginOperator(desaPilihan, usernameInput, passwordInput
   };
 }
 
-// Cek Sesi Aktif Operator
+/**
+ * Memeriksa sesi login aktif dari localStorage.
+ */
 function cekSesiOperator() {
   const desa = localStorage.getItem('operator_desa');
   const username = localStorage.getItem('operator_username');
@@ -99,84 +110,159 @@ function cekSesiOperator() {
   return null;
 }
 
-// Logout Operator
+/**
+ * Menghapus sesi login operator dan mengalihkan ke halaman login.
+ */
 function logoutOperator() {
-  localStorage.removeItem('operator_desa');
-  localStorage.removeItem('operator_username');
-  window.location.href = 'index.html';
+  if (confirm("Apakah Anda yakin ingin keluar dari portal operator?")) {
+    localStorage.removeItem('operator_desa');
+    localStorage.removeItem('operator_username');
+    window.location.href = 'index.html';
+  }
 }
 
-// ==========================================
-// 3. Modul Pengolahan Data PBB-P2 & Sync
-// ==========================================
+// ============================================================================
+// 3. MODUL PENGOLAHAN DATA PBB-P2 & SINKRONISASI (ANTI "FAILED TO FETCH")
+// ============================================================================
 
-// Tambah Data WP (Otomatis deteksi Online/Offline)
+/**
+ * Menyimpan data Wajib Pajak baru atau Pembayaran Pajak.
+ * Secara otomatis memilih jalur Direct Upload (Online) atau Antrean Offline.
+ */
 async function tambahDataWP(dataBaru) {
-  if (navigator.onLine && typeof supabaseClient !== 'undefined') {
-    try {
-      const { data, error } = await supabaseClient
-        .from('pbb_p2')
-        .insert([dataBaru]);
+  // 1. JIKA OFFLINE: Langsung simpan ke antrean lokal tanpa memanggil Supabase SDK
+  if (!navigator.onLine || typeof supabaseClient === 'undefined') {
+    return await simpanOffline(dataBaru);
+  }
 
-      if (error) throw error;
+  // 2. JIKA ONLINE: Coba kirim ke Database Utama dengan Penanganan Exception Strict
+  try {
+    let tableName = dataBaru.jumlah_bayar !== undefined ? 'pembayaran_pajak' : 'wajib_pajak';
+    
+    const { error } = await supabaseClient
+      .from(tableName)
+      .insert([dataBaru]);
 
+    if (error) throw error;
+
+    // Cache juga ke memori lokal
+    if (tableName === 'wajib_pajak') {
       await db.wajibPajak.add(dataBaru);
-      return { success: true, mode: 'online' };
-    } catch (err) {
-      console.warn("Gagal terhubung ke Database Utama, menyimpan ke antrean offline...", err);
-      return await simpanOffline(dataBaru);
+    } else {
+      await db.pembayaranPajak.add(dataBaru);
     }
-  } else {
+
+    return { success: true, mode: 'online' };
+  } catch (err) {
+    console.warn("Panggilan Database Utama gagal (Sinyal terputus), mengalihkan ke antrean offline...", err);
     return await simpanOffline(dataBaru);
   }
 }
 
-// Simpan ke Antrean Offline Lokal
+/**
+ * Menyimpan data ke Antrean Offline (IndexedDB) ketika koneksi internet tidak tersedia.
+ */
 async function simpanOffline(dataBaru) {
-  await db.antreanInput.add({ ...dataBaru, status: 'pending' });
-  await db.wajibPajak.add(dataBaru);
+  const tipeData = dataBaru.jumlah_bayar !== undefined ? 'pembayaran' : 'wp_baru';
+
+  await db.antreanInput.add({
+    ...dataBaru,
+    tipe: tipeData,
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  });
+
+  // Simpan juga ke cache lokal agar tabel tampilan langsung ter-update secara realtime
+  if (tipeData === 'wp_baru') {
+    await db.wajibPajak.add(dataBaru);
+  } else {
+    await db.pembayaranPajak.add(dataBaru);
+  }
+
   return { success: true, mode: 'offline' };
 }
 
-// Ambil Data WP (Menampilkan data dari Database Utama atau Cache Lokal)
-async function ambilDataWP() {
-  if (navigator.onLine && typeof supabaseClient !== 'undefined') {
-    try {
-      const { data, error } = await supabaseClient.from('pbb_p2').select('*');
-      if (error) throw error;
+/**
+ * Membaca seluruh data Wajib Pajak dan Pembayaran secara efisien.
+ * Mengutamakan keselamatan panggilan jaringan saat offline.
+ */
+async function ambilDataWP(desaFilter, isAdminKecamatan) {
+  // A. BACA DARI INDEXEDDB LOKAL JIKA SEDANG OFFLINE (Mencegah Error TypeError: Failed to fetch)
+  if (!navigator.onLine || typeof supabaseClient === 'undefined') {
+    console.log("📲 Mode Offline: Membaca data PBB-P2 dari IndexedDB lokal...");
+    return await ambilDataDariLokal(desaFilter, isAdminKecamatan);
+  }
 
-      // Update cache lokal
+  // B. BACA DARI DATABASE UTAMA JIKA ONLINE
+  try {
+    const { data: dataWP, error: errWP } = await supabaseClient
+      .from('wajib_pajak')
+      .select('*');
+
+    if (errWP) throw errWP;
+
+    // Perbarui Cache Wajib Pajak di IndexedDB lokal
+    if (dataWP && dataWP.length > 0) {
       await db.wajibPajak.clear();
-      await db.wajibPajak.bulkAdd(data);
-      return data;
-    } catch (err) {
-      console.warn("Gagal mengambil data dari Database Utama, memuat dari cadangan lokal...", err);
-      return await db.wajibPajak.toArray();
+      await db.wajibPajak.bulkAdd(dataWP);
     }
-  } else {
-    return await db.wajibPajak.toArray();
+
+    return await ambilDataDariLokal(desaFilter, isAdminKecamatan);
+
+  } catch (err) {
+    console.warn("⚠️ Terjadi kesalahan koneksi saat mengambil data utama, menggunakan cadangan lokal:", err.message);
+    return await ambilDataDariLokal(desaFilter, isAdminKecamatan);
   }
 }
 
-// Sinkronisasi Otomatis Antrean Data saat Koneksi Internet Kembali Terhubung
+/**
+ * Helper untuk menyaring data dari IndexedDB berdasarkan hak akses Desa/Kecamatan.
+ */
+async function ambilDataDariLokal(desaFilter, isAdminKecamatan) {
+  let listWP = await db.wajibPajak.toArray();
+
+  if (!isAdminKecamatan) {
+    listWP = listWP.filter(item => item.desa === desaFilter);
+  } else if (desaFilter && desaFilter !== 'SEMUA') {
+    listWP = listWP.filter(item => item.desa === desaFilter);
+  }
+
+  return listWP;
+}
+
+// ============================================================================
+// 4. OTOMATISASI SINKRONISASI ANTREAN DATA SAAT KONEKSI INTERNET PULIH
+// ============================================================================
 window.addEventListener('online', async () => {
-  console.log("🌐 Koneksi terhubung kembali! Memulai sinkronisasi data...");
-  
-  // Sync akun operator
+  console.log("🌐 Koneksi internet terhubung kembali! Memulai proses sinkronisasi...");
+
+  // 1. Sync data akun operator
   await syncOperatorLokal();
 
-  // Sync antrean input WP ke Database Utama
+  // 2. Sync antrean input WP & Pembayaran Pajak ke Database Utama
   if (typeof supabaseClient !== 'undefined') {
-    const antrean = await db.antreanInput.where('status').equals('pending').toArray();
+    try {
+      const antrean = await db.antreanInput.where('status').equals('pending').toArray();
 
-    for (const item of antrean) {
-      const { id, status, ...payload } = item;
-      const { error } = await supabaseClient.from('pbb_p2').insert([payload]);
+      for (const item of antrean) {
+        const { id, tipe, status, createdAt, ...payload } = item;
+        let tableName = tipe === 'pembayaran' ? 'pembayaran_pajak' : 'wajib_pajak';
 
-      if (!error) {
-        await db.antreanInput.delete(id);
+        const { error } = await supabaseClient.from(tableName).insert([payload]);
+
+        if (!error) {
+          // Hapus dari antrean jika sukses terkirim
+          await db.antreanInput.delete(id);
+          console.log(`✅ Data antrean [${tipe}] NOP ${payload.nop} berhasil dikirim ke Database.`);
+        }
       }
+
+      // Refresh tampilan jika halaman dashboard aktif
+      if (typeof loadData === 'function') {
+        loadData();
+      }
+    } catch (err) {
+      console.warn("Gagal melakukan sinkronisasi otomatis:", err.message);
     }
-    console.log("✅ Sinkronisasi data offline ke Database selesai!");
   }
 });
