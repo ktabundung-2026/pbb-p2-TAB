@@ -15,9 +15,15 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Meng-cache seluruh aset offline...');
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Meng-cache file satu per satu agar jika ada 1 CDN gagal, file lain tetap ter-cache
+      for (const asset of ASSETS_TO_CACHE) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn(`Gagal meng-cache aset: ${asset}`, err);
+        }
+      }
     })
   );
   self.skipWaiting();
