@@ -4,25 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Monitoring Pajak PBB-P2 - Kecamatan Tabundung</title>
+  
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- FontAwesome untuk ikon -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="manifest" href="manifest.json">
+  
   <!-- Supabase JS & Dexie JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
   <script src="db.js"></script>
+  
   <script>
-  // Registrasi Service Worker
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log("SW Registered"))
-        .catch(err => console.error("SW Failed", err));
-    });
+    // Registrasi Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log("SW Registered"))
+          .catch(err => console.error("SW Failed", err));
+      });
     }
   </script>
+  
   <style>
     body { background-color: #f8f9fa; font-size: 0.85rem; }
     .filter-btn { font-size: 0.70rem; padding: 4px 6px; }
@@ -67,6 +71,12 @@
       </div>
       <h6 class="fw-bold text-dark mb-1" id="textNamaDesaHeader">Kecamatan Tabundung</h6>
       
+      <!-- BADGE STATUS KONEKSI & ANTREAN SYNC OFFLINE -->
+      <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
+        <span id="statusKoneksi" class="badge bg-secondary" style="font-size: 0.7rem;">Mengecek koneksi...</span>
+        <span id="badgeAntrean" class="badge bg-warning text-dark d-none" style="font-size: 0.7rem;">0 Data Pending</span>
+      </div>
+
       <!-- DROPDOWN PILIH DESA KHUSUS ADMIN KECAMATAN -->
       <div id="containerPilihDesa" class="mt-2" style="display: none;">
         <select id="selectDesaAdmin" class="form-select form-select-sm w-75 mx-auto fw-bold text-primary" onchange="onChangeDesaAdmin()">
@@ -279,19 +289,18 @@
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Supabase JS Client library -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
-    // 1. CEK AUTENTIKASI SESI OPERATOR
-    const activeDesa = sessionStorage.getItem('operator_desa');
-    const activeUsername = sessionStorage.getItem('operator_username');
+    // 1. CEK AUTENTIKASI SESI OPERATOR DARI DB.JS (HYBRID LOCALSTORAGE)
+    const sesiOperator = cekSesiOperator();
 
-    if (!activeDesa) {
+    if (!sesiOperator) {
       alert("Anda harus login terlebih dahulu!");
       window.location.href = 'index.html';
     }
 
+    const activeDesa = sesiOperator ? sesiOperator.desa : '';
+    const activeUsername = sesiOperator ? sesiOperator.username : '';
     const isAdminKecamatan = (activeDesa.toLowerCase() === 'kecamatan' || activeDesa.toLowerCase() === 'admin');
 
     // --- KREDENSIAL SUPABASE ---
@@ -302,13 +311,41 @@
     let globalData = [];
     let currentFilterStatus = 'Semua';
 
+    // Pembaruan Status Koneksi Realtime & Jumlah Antrean Sync
+    async function updateStatusKoneksi() {
+      const elStatus = document.getElementById('statusKoneksi');
+      const elAntrean = document.getElementById('badgeAntrean');
+
+      if (navigator.onLine) {
+        elStatus.className = "badge bg-success";
+        elStatus.innerHTML = '<i class="fa-solid fa-wifi"></i> Online';
+      } else {
+        elStatus.className = "badge bg-warning text-dark";
+        elStatus.innerHTML = '<i class="fa-solid fa-plane-slash"></i> Offline';
+      }
+
+      // Cek jumlah data yang masih mengantre di IndexedDB
+      if (typeof db !== 'undefined') {
+        const jumlahAntrean = await db.antreanInput.where('status').equals('pending').count();
+        if (jumlahAntrean > 0) {
+          elAntrean.classList.remove('d-none');
+          elAntrean.innerText = `${jumlahAntrean} Data Belum Tersinkron`;
+        } else {
+          elAntrean.classList.add('d-none');
+        }
+      }
+    }
+
     window.onload = function() {
+      updateStatusKoneksi();
+      window.addEventListener('online', updateStatusKoneksi);
+      window.addEventListener('offline', updateStatusKoneksi);
+
       if (isAdminKecamatan) {
         document.getElementById('textNamaDesaHeader').innerText = "Rekapitulasi Kecamatan Tabundung";
         document.getElementById('containerPilihDesa').style.display = 'block';
         document.getElementById('containerBtnInput').style.display = 'none';
         
-        // Hapus elemen modal input dari DOM agar bersih bagi Admin Kecamatan
         let modalEl = document.getElementById('modalInput');
         if (modalEl) modalEl.remove();
       } else {
@@ -337,55 +374,77 @@
       if(inputTahun) inputTahun.innerHTML = optionsInput;
     }
 
-    // HELPER: AMBIL DATA SUPABASE SECARA PARALEL (SUPPORT SEMUA DESA ATAU SPESIFIK DESA)
+    // HELPER: AMBIL DATA DENGAN DUKUNGAN ONLINE & OFFLINE (INDEXEDDB)
     async function fetchTableDataInParallel(tableName) {
-      let step = 1000;
-      let query = supabaseClient.from(tableName).select('*', { count: 'exact' });
+      if (navigator.onLine && typeof supabaseClient !== 'undefined') {
+        try {
+          let step = 1000;
+          let query = supabaseClient.from(tableName).select('*', { count: 'exact' });
 
-      let filterDesa = activeDesa;
-      if (isAdminKecamatan) {
+          let filterDesa = activeDesa;
+          if (isAdminKecamatan) {
+            let selectedDesaAdmin = document.getElementById('selectDesaAdmin').value;
+            if (selectedDesaAdmin !== 'SEMUA') filterDesa = selectedDesaAdmin;
+          }
+
+          if (!isAdminKecamatan || (isAdminKecamatan && document.getElementById('selectDesaAdmin').value !== 'SEMUA')) {
+            query = query.eq('desa', filterDesa);
+          }
+
+          const { data: firstBatch, error: errFirst, count } = await query.range(0, step - 1);
+          if (errFirst) throw errFirst;
+
+          let allRecords = [...(firstBatch || [])];
+          let totalRecords = count || allRecords.length;
+
+          if (totalRecords > step) {
+            let promises = [];
+            for (let rangeStart = step; rangeStart < totalRecords; rangeStart += step) {
+              let nextQuery = supabaseClient.from(tableName).select('*');
+              if (!isAdminKecamatan || (isAdminKecamatan && document.getElementById('selectDesaAdmin').value !== 'SEMUA')) {
+                nextQuery = nextQuery.eq('desa', filterDesa);
+              }
+              promises.push(nextQuery.range(rangeStart, rangeStart + step - 1));
+            }
+
+            const results = await Promise.all(promises);
+            results.forEach(res => {
+              if (res.error) throw res.error;
+              if (res.data) allRecords = allRecords.concat(res.data);
+            });
+          }
+
+          return allRecords;
+        } catch (err) {
+          console.warn(`Gagal mengambil ${tableName} dari Database Utama, membaca cadangan lokal...`, err);
+        }
+      }
+
+      // Pembacaan Cadangan dari IndexedDB lokal jika offline / error jaringan
+      let localData = await db.wajibPajak.toArray();
+      if (!isAdminKecamatan) {
+        localData = localData.filter(d => d.desa === activeDesa);
+      } else {
         let selectedDesaAdmin = document.getElementById('selectDesaAdmin').value;
         if (selectedDesaAdmin !== 'SEMUA') {
-          filterDesa = selectedDesaAdmin;
+          localData = localData.filter(d => d.desa === selectedDesaAdmin);
         }
       }
-
-      if (!isAdminKecamatan || (isAdminKecamatan && document.getElementById('selectDesaAdmin').value !== 'SEMUA')) {
-        query = query.eq('desa', filterDesa);
-      }
-
-      const { data: firstBatch, error: errFirst, count } = await query.range(0, step - 1);
-      if (errFirst) throw errFirst;
-
-      let allRecords = [...(firstBatch || [])];
-      let totalRecords = count || allRecords.length;
-
-      if (totalRecords > step) {
-        let promises = [];
-        for (let rangeStart = step; rangeStart < totalRecords; rangeStart += step) {
-          let nextQuery = supabaseClient.from(tableName).select('*');
-          if (!isAdminKecamatan || (isAdminKecamatan && document.getElementById('selectDesaAdmin').value !== 'SEMUA')) {
-            nextQuery = nextQuery.eq('desa', filterDesa);
-          }
-          promises.push(nextQuery.range(rangeStart, rangeStart + step - 1));
-        }
-
-        const results = await Promise.all(promises);
-        results.forEach(res => {
-          if (res.error) throw res.error;
-          if (res.data) allRecords = allRecords.concat(res.data);
-        });
-      }
-
-      return allRecords;
+      return localData;
     }
 
     async function loadData() {
       try {
-        const [allWpList, allBayarList] = await Promise.all([
-          fetchTableDataInParallel('wajib_pajak'),
-          fetchTableDataInParallel('pembayaran_pajak')
-        ]);
+        let allWpList = await fetchTableDataInParallel('wajib_pajak');
+        let allBayarList = [];
+
+        if (navigator.onLine && typeof supabaseClient !== 'undefined') {
+          try {
+            allBayarList = await fetchTableDataInParallel('pembayaran_pajak');
+          } catch(e) {
+            console.warn("Membaca pembayaran dari lokal");
+          }
+        }
 
         let petaBayar = {};
         allBayarList.forEach(b => {
@@ -402,8 +461,8 @@
           let tahunStr = String(wp.tahun_tagihan);
           let key = `${nop}_${tahunStr}`;
           let totalTagihan = Number(wp.total_tagihan) || 0;
-          let jumlahBayar = petaBayar[key] ? petaBayar[key].total : 0;
-          let tglSetor = petaBayar[key] ? petaBayar[key].tgl : '-';
+          let jumlahBayar = petaBayar[key] ? petaBayar[key].total : (Number(wp.jumlah_bayar) || 0);
+          let tglSetor = petaBayar[key] ? petaBayar[key].tgl : (wp.tanggal_setor || '-');
           let sisaTagihan = Math.max(0, totalTagihan - jumlahBayar);
           
           let status = "Belum Bayar";
@@ -432,7 +491,7 @@
 
         filterData();
       } catch (err) {
-        alert("Gagal memuat data : " + err.message);
+        console.error("Gagal memuat data:", err);
       }
     }
 
@@ -551,14 +610,7 @@
       renderList(filteredFinal);
     }
 
-    function logoutOperator() {
-      if (confirm("Apakah Anda yakin ingin keluar dari portal operator?")) {
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-      }
-    }
-
-    // FUNGSI INPUT PEMBAYARAN OPERATOR DESA (Hanya aktif jika bukan admin kecamatan)
+    // FUNGSI INPUT PEMBAYARAN OPERATOR DESA (Mendukung Simpan Online / Offline)
     if (!isAdminKecamatan) {
       function bukaModalInput() {
         document.getElementById('formBayar').reset();
@@ -660,6 +712,7 @@
         }
       }
 
+      // SUBMIT FORM PEMBAYARAN DENGAN HYBRID OFFLINE/ONLINE DB.JS
       document.getElementById('formBayar').addEventListener('submit', async function(e) {
         e.preventDefault();
         let tahunTagihan = Number(document.getElementById('inputPilihTahun').value);
@@ -683,31 +736,34 @@
 
         try {
           let formBaruVisible = document.getElementById('formWPBaru').style.display !== 'none';
+          let payloadBaru = {
+            nop: nopWP, 
+            nama: namaWP || 'Wajib Pajak', 
+            tahun_tagihan: tahunTagihan, 
+            total_tagihan: totalTagihanBaru || jumlah,
+            desa: activeDesa
+          };
+
+          // Simpan via modul tambahDataWP di db.js (Otomatis handle Online ke Database / Offline ke Antrean)
           if (pilihanWP === 'BARU' || formBaruVisible) {
-            const { error: errInsWP } = await supabaseClient.from('wajib_pajak').insert([
-              { 
-                nop: nopWP, 
-                nama: namaWP, 
-                tahun_tagihan: tahunTagihan, 
-                total_tagihan: totalTagihanBaru,
-                desa: activeDesa 
-              }
-            ]);
-            if (errInsWP) throw errInsWP;
+            await tambahDataWP(payloadBaru);
           }
 
-          const { error: errInsBayar } = await supabaseClient.from('pembayaran_pajak').insert([
-            { 
-              nop: nopWP, 
-              tahun_tagihan: tahunTagihan, 
-              jumlah_bayar: jumlah, 
-              tanggal_setor: tanggal,
-              desa: activeDesa 
-            }
-          ]);
-          if (errInsBayar) throw errInsBayar;
+          let payloadBayar = { 
+            nop: nopWP, 
+            tahun_tagihan: tahunTagihan, 
+            jumlah_bayar: jumlah, 
+            tanggal_setor: tanggal,
+            desa: activeDesa 
+          };
 
-          alert(`✅ Data pembayaran NOP ${nopWP} (${activeDesa}) berhasil disimpan!`);
+          const hasil = await tambahDataWP(payloadBayar);
+
+          if (hasil.mode === 'online') {
+            alert(`✅ Data pembayaran NOP ${nopWP} (${activeDesa}) berhasil disimpan!`);
+          } else {
+            alert(`📲 Mode Offline: Data pembayaran NOP ${nopWP} tersimpan di perangkat lokal dan akan disinkronkan otomatis saat ada koneksi internet.`);
+          }
 
           let lastTahun = document.getElementById('inputPilihTahun').value;
           let lastTanggal = document.getElementById('tglSetor').value;
