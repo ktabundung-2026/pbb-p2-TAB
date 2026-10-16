@@ -714,7 +714,7 @@
       // MENGATUR DATA KOLOM: No - NOP / Nama WP - Tahun - Tagihan - Status
       const tableData = currentFilteredDataForPDF.map((item, index) => [
         index + 1,
-        `${item.nop}\n${item.nama}`,
+        `${item.nama}\n${item.nop}`,
         item.tahunTagihan,
         `Rp ${item.totalTagihan.toLocaleString('id-ID')}`,
         item.status
