@@ -162,7 +162,7 @@
     <!-- Kotak Pencarian -->
     <div class="input-group input-group-sm mb-2">
       <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
-      <input type="text" id="searchBox" class="form-control" placeholder="Cari NOP atau Nama WP..." onkeyup="filterData()">
+      <input type="text" id="searchBox" class="form-control" placeholder="Cari Nama WP atau NOP..." onkeyup="filterData()">
     </div>
 
     <!-- Tombol Filter Status & Tahun & Download PDF -->
@@ -176,7 +176,6 @@
         </div>
       </div>
       <div class="col-12 col-sm-6 d-flex gap-1">
-        <!-- Tombol Download PDF diletakkan persis sebelum tombol pilih tahun -->
         <button class="btn btn-danger btn-sm filter-btn fw-bold text-nowrap" onclick="bukaModalPengesahanPDF()">
           <i class="fa-solid fa-file-pdf"></i> Download PDF
         </button>
@@ -192,7 +191,7 @@
         <thead>
           <tr>
             <th class="text-center">No</th>
-            <th>NOP / Nama WP</th>
+            <th>Nama WP / NOP</th>
             <th class="text-center">Tahun</th>
             <th class="text-end">Tagihan</th>
             <th class="text-end">Dibayar</th>
@@ -594,6 +593,7 @@
       filterData();
     }
 
+    /* RENDER TABEL HTML: NAMA WP DULU, NOP DI BAWAHNYA */
     function renderList(data) {
       let tbody = document.getElementById('listWPTable');
       if (data.length === 0) {
@@ -612,7 +612,7 @@
             <td class="text-center">${item.no}</td>
             <td>
               <div class="fw-bold text-dark">${item.nama}</div>
-              <small class="text-muted" style="font-size: 0.7rem;">NOP: ${item.nop} ${isAdminKecamatan ? ' | Desa: ' + item.desa : ''}</small>
+              <small class="text-muted d-block" style="font-size: 0.72rem;">NOP: ${item.nop} ${isAdminKecamatan ? ' | Desa: ' + item.desa : ''}</small>
             </td>
             <td class="text-center text-nowrap fw-semibold">${item.tahunTagihan}</td>
             <td class="text-end text-nowrap">Rp ${item.totalTagihan.toLocaleString('id-ID')}</td>
@@ -654,7 +654,7 @@
       renderList(filteredFinal);
     }
 
-    /* FITUR BUAT MODAL PENGESAHAN & GENERATE PDF */
+    /* MODAL PENGESAHAN & GENERATE PDF DENGAN RINGKASAN REKAPITULASI KEUANGAN DAN WP */
     function bukaModalPengesahanPDF() {
       if (currentFilteredDataForPDF.length === 0) {
         alert("Tidak ada data yang tersedia untuk dicetak.");
@@ -711,18 +711,73 @@
       doc.setLineWidth(0.5);
       doc.line(14, 34, 196, 34);
 
-      // MENGATUR DATA KOLOM: No - NOP / Nama WP - Tahun - Tagihan - Status
+      // ==========================================
+      // HITUNG RINGKASAN PROGRES & STATUS WP
+      // ==========================================
+      let totalTagihanSum = 0;
+      let totalBayarSum = 0;
+      let countBelum = 0;
+      let countLunas = 0;
+      let countPenghapusan = 0;
+
+      currentFilteredDataForPDF.forEach(item => {
+        totalTagihanSum += Number(item.totalTagihan) || 0;
+        totalBayarSum += Number(item.jumlahBayar) || 0;
+
+        if (item.status === 'Belum Bayar') countBelum++;
+        else if (item.status === 'Lunas') countLunas++;
+        else if (item.status === 'Penghapusan Pajak') countPenghapusan++;
+      });
+
+      let totalSisaSum = Math.max(0, totalTagihanSum - totalBayarSum);
+      let persentaseBayar = totalTagihanSum > 0 ? ((totalBayarSum / totalTagihanSum) * 100).toFixed(1) : "0.0";
+      let totalWpSum = currentFilteredDataForPDF.length;
+
+      // ==========================================
+      // TABEL RINGKASAN PROGRES KEUANGAN & WP (PDF)
+      // ==========================================
+      const summaryHead = [
+        [{ content: 'RINGKASAN PROGRES REALISASI PAJAK PBB-P2', colSpan: 4, styles: { halign: 'center', fillColor: [220, 224, 230], textColor: [30, 30, 30], fontStyle: 'bold' } }]
+      ];
+
+      const summaryBody = [
+        [
+          `Total Tagihan: Rp ${totalTagihanSum.toLocaleString('id-ID')}`,
+          `Jumlah Bayar: Rp ${totalBayarSum.toLocaleString('id-ID')}`,
+          `Sisa Tagihan: Rp ${totalSisaSum.toLocaleString('id-ID')}`,
+          `Persentase: ${persentaseBayar}%`
+        ],
+        [
+          `Total WP: ${totalWpSum.toLocaleString('id-ID')} WP`,
+          `Belum Bayar: ${countBelum.toLocaleString('id-ID')} WP`,
+          `Lunas: ${countLunas.toLocaleString('id-ID')} WP`,
+          `Penghapusan: ${countPenghapusan.toLocaleString('id-ID')} WP`
+        ]
+      ];
+
+      doc.autoTable({
+        startY: 37,
+        head: summaryHead,
+        body: summaryBody,
+        theme: 'grid',
+        bodyStyles: { fontSize: 8, fontStyle: 'bold', halign: 'center' },
+        margin: { left: 14, right: 14 }
+      });
+
+      // ==========================================
+      // TABEL DETAIL DATA WAJIB PAJAK
+      // ==========================================
       const tableData = currentFilteredDataForPDF.map((item, index) => [
         index + 1,
-        `${item.nama}\n${item.nop}`,
+        `${item.nama}\nNOP: ${item.nop}`,
         item.tahunTagihan,
         `Rp ${item.totalTagihan.toLocaleString('id-ID')}`,
         item.status
       ]);
 
       doc.autoTable({
-        startY: 37,
-        head: [['No', 'NOP / Nama WP', 'Tahun', 'Tagihan', 'Status']],
+        startY: doc.lastAutoTable.finalY + 5,
+        head: [['No', 'Nama WP / NOP', 'Tahun', 'Tagihan', 'Status']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [13, 110, 253], textColor: 255, halign: 'center', fontSize: 9 },
@@ -740,7 +795,6 @@
       // PENGESAHAN DIBAGIAN AKHIR
       let finalY = doc.lastAutoTable.finalY + 10;
 
-      // Jika ruang tidak cukup untuk blok tanda tangan, tambah halaman baru
       if (finalY > 230) {
         doc.addPage();
         finalY = 20;
@@ -749,16 +803,14 @@
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
 
-      // Tanggal Cetak
       doc.text(`Tabundung, ${tglCetakVal}`, 196, finalY, { align: "right" });
       finalY += 6;
 
-      // Layout 3 Kolom Tanda Tangan (Operator, Kepala Desa, Camat)
       const col1X = 14;   // Operator Desa
-      const col2X = 105;  // Kepala Desa (Tengah)
-      const col3X = 196;  // Camat Tabundung (Kanan)
+      const col2X = 105;  // Kepala Desa
+      const col3X = 196;  // Camat Tabundung
 
-      doc.text("Dibuat oleh:,", col1X, finalY);
+      doc.text("Mengetahui,", col1X, finalY);
       doc.text("Menyetujui,", col2X, finalY, { align: "center" });
       doc.text("Mengesahkan,", col3X, finalY, { align: "right" });
 
@@ -767,7 +819,6 @@
       doc.text("Kepala Desa,", col2X, finalY, { align: "center" });
       doc.text("Camat Tabundung,", col3X, finalY, { align: "right" });
 
-      // Jarak untuk Tanda Tangan
       finalY += 22;
 
       doc.setFont("helvetica", "bold");
@@ -777,7 +828,6 @@
 
       doc.save(`Laporan_PBB_P2_${desaVal.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
 
-      // Tutup Modal
       let modalEl = document.getElementById('modalPengesahanPDF');
       let modal = bootstrap.Modal.getInstance(modalEl);
       if(modal) modal.hide();
@@ -812,7 +862,7 @@
         options += `<option value="BARU" class="fw-bold text-primary">➕ [ + Tambah Wajib Pajak Baru ]</option>`;
         
         filteredWP.forEach(item => {
-          options += `<option value="${item.nop}" data-sisa="${item.sisaTagihan}">[NOP: ${item.nop}] - ${item.nama} (${item.status} | Sisa: Rp ${item.sisaTagihan.toLocaleString('id-ID')})</option>`;
+          options += `<option value="${item.nop}" data-sisa="${item.sisaTagihan}">[${item.nama}] - NOP: ${item.nop} (${item.status} | Sisa: Rp ${item.sisaTagihan.toLocaleString('id-ID')})</option>`;
         });
         dropdownWP.innerHTML = options;
       }
