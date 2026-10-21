@@ -59,16 +59,32 @@
     .badge-wp-count { font-size: 0.8rem; }
 
     /* ========================================================= */
-    /* PENYESUAIAN UKURAN HURUF DROPDOWN UNTUK TAMPILAN HP        */
+    /* PENYESUAIAN DROPDOWN NAMA WP AGAR PROPORSIONAL DI HP       */
     /* ========================================================= */
+    #dropdownPilihWP {
+      font-size: 0.72rem !important;
+      padding: 6px 8px;
+      max-width: 100%;
+      white-space: normal;
+      word-wrap: break-word;
+    }
+
+    #dropdownPilihWP option {
+      font-size: 0.70rem !important;
+      padding: 6px 4px;
+      line-height: 1.3;
+      border-bottom: 1px dashed #e9ecef;
+      white-space: pre-wrap; /* Memungkinkan baris baru (\n) pada elemen option di browser Android/Mobile */
+    }
+
     @media (max-width: 576px) {
-      #dropdownPilihWP, 
-      #dropdownPilihWP option,
+      .modal-dialog {
+        margin: 0.5rem;
+      }
       .modal-body .form-select,
       .modal-body .form-control {
-        font-size: 0.73rem !important; /* Huruf diperkecil agar nama WP mudah dibaca dan tidak terpotong */
-        padding-top: 5px;
-        padding-bottom: 5px;
+        font-size: 0.72rem !important;
+        padding: 5px 8px;
       }
     }
   </style>
@@ -247,13 +263,14 @@
               </select>
             </div>
 
-            <!-- Input Manual NOP (Ditempatkan di Atas Dropdown) -->
+            <!-- Input Manual NOP -->
             <div class="mb-2">
               <label class="form-label mb-0" style="font-size: 0.75rem;"><i class="fa-solid fa-barcode text-primary"></i> Ketik NOP Secara Manual</label>
               <input type="text" id="inputManualNOP" class="form-control form-control-sm fw-bold text-primary" placeholder="Masukkan NOP..." onkeyup="handleManualNOPInput(this)">
               <div id="infoNamaWpManual" class="form-text text-primary fw-bold mt-1" style="font-size: 0.75rem; display: none;"></div>
             </div>
 
+            <!-- Dropdown Pilih WP (Ukuran & Format diperbaiki) -->
             <div class="mb-2">
               <label class="form-label mb-1" style="font-size: 0.75rem;">Atau Pilih Dari Daftar Wajib Pajak</label>
               <select id="dropdownPilihWP" class="form-select form-select-sm" onchange="handleWPChange(this)">
@@ -848,6 +865,9 @@
         modal.show();
       }
 
+      /* ========================================================= */
+      /*  HANDLE PENGUBAHAN TAHUN & DENGAN FORMAT NOP DI BAWAH NAMA */
+      /* ========================================================= */
       function handleTahunChange(selectElement) {
         let tahunPilihan = selectElement.value;
         let dropdownWP = document.getElementById('dropdownPilihWP');
@@ -867,7 +887,8 @@
         options += `<option value="BARU" class="fw-bold text-primary">➕ [ + Tambah Wajib Pajak Baru ]</option>`;
         
         filteredWP.forEach(item => {
-          options += `<option value="${item.nop}" data-sisa="${item.sisaTagihan}">[${item.nama}] - NOP: ${item.nop} (${item.status} | Sisa: Rp ${item.sisaTagihan.toLocaleString('id-ID')})</option>`;
+          // Mengatur susunan tampilan: Nama WP di Atas, NOP dan Sisa Tagihan di Bawahnya
+          options += `<option value="${item.nop}" data-sisa="${item.sisaTagihan}">${item.nama.toUpperCase()}\n   ↳ NOP: ${item.nop} | Sisa: Rp ${item.sisaTagihan.toLocaleString('id-ID')} (${item.status})</option>`;
         });
         dropdownWP.innerHTML = options;
       }
@@ -906,7 +927,7 @@
       }
 
       /* ========================================================= */
-      /*  REALTIME NOP INPUT: OPERATOR LANGSUNG BISA SIMPAN        */
+      /*  REALTIME INPUT NOP MANUAL: LANGSUNG DAPAT DISIMPAN        */
       /* ========================================================= */
       function handleManualNOPInput(inputElement) {
         let manualNop = inputElement.value.trim();
@@ -917,7 +938,7 @@
         let tahunPilihan = document.getElementById('inputPilihTahun').value;
 
         if (manualNop.length > 0) {
-          dropdownWP.value = ""; // Reset dropdown agar tidak bentrok
+          dropdownWP.value = ""; // Kosongkan nilai dropdown agar fokus pada pengisian NOP manual
           formBaru.style.display = 'none';
 
           // Cari data WP berdasarkan NOP dan Tahun Tagihan
@@ -927,14 +948,14 @@
             if (!inputJumlahBayar.value || inputJumlahBayar.value == found.sisaTagihan) {
               inputJumlahBayar.value = found.sisaTagihan;
             }
-            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-check text-success"></i> WP: <strong>${found.nama}</strong> | Tagihan: Rp ${Number(found.totalTagihan).toLocaleString('id-ID')} | Sisa: Rp ${Number(found.sisaTagihan).toLocaleString('id-ID')}`;
+            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-check text-success"></i> WP: <strong>${found.nama}</strong><br><small class="text-secondary">Tagihan: Rp ${Number(found.totalTagihan).toLocaleString('id-ID')} | Sisa: Rp ${Number(found.sisaTagihan).toLocaleString('id-ID')}</small>`;
             infoNamaWpManual.style.display = 'block';
 
             document.getElementById('inputNOPBaru').required = false;
             document.getElementById('inputNamaBaru').required = false;
             document.getElementById('inputTagihanBaru').required = false;
           } else {
-            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-info text-warning"></i> NOP belum terdaftar. Isi data WP baru di bawah untuk mendaftarkannya.`;
+            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-info text-warning"></i> NOP belum terdaftar. Silakan isi data WP baru di bawah ini.`;
             infoNamaWpManual.style.display = 'block';
             formBaru.style.display = 'block';
             document.getElementById('inputNOPBaru').value = manualNop;
@@ -959,7 +980,7 @@
         let jumlah = Number(document.getElementById('jumlahBayar').value);
         let tanggal = document.getElementById('tglSetor').value;
         
-        // Utama: Ambil dari NOP Manual jika diisi, atau dari pilihan dropdown
+        // Menggunakan NOP Manual jika diisi, atau nilai NOP dari dropdown
         let nopWP = manualNOP || (pilihanWP !== 'BARU' ? pilihanWP : document.getElementById('inputNOPBaru').value.trim());
         let namaWP = document.getElementById('inputNamaBaru').value.trim();
         let totalTagihanBaru = Number(document.getElementById('inputTagihanBaru').value);
