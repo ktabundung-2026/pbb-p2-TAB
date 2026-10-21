@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pbb-p2-tab-v2';
+const CACHE_NAME = 'pbb-p2-tab-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,13 +10,14 @@ const ASSETS_TO_CACHE = [
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://unpkg.com/dexie/dist/dexie.js'
+  'https://unpkg.com/dexie/dist/dexie.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Meng-cache file satu per satu agar jika ada 1 CDN gagal, file lain tetap ter-cache
       for (const asset of ASSETS_TO_CACHE) {
         try {
           await cache.add(asset);
@@ -45,17 +46,33 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Hanya tangani GET request untuk file static/HTML/CDN
+  if (event.request.url.includes('supabase.co')) {
+    return;
+  }
+
   if (event.request.method === 'GET') {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
           return cachedResponse;
         }
-        return fetch(event.request).catch(() => {
-          // Jika fetch gagal (offline), kembalikan penanganan offline jika ada
-          console.warn('Offline mode: Gagal mengambil aset dari jaringan');
-        });
+
+        return fetch(event.request)
+          .then((networkResponse) => {
+            if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+              return networkResponse;
+            }
+
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+
+            return networkResponse;
+          })
+          .catch(() => {
+            console.warn('Offline mode: Gagal mengambil aset dari jaringan');
+          });
       })
     );
   }
