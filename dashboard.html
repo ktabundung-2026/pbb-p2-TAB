@@ -132,4 +132,902 @@
       <!-- Ringkasan Keuangan (Rp) -->
       <div class="row text-center g-2 mb-3 pb-2 border-bottom">
         <div class="col-4 border-end">
-          <span class="text-muted d-block" style="font-size
+          <span class="text-muted d-block" style="font-size: 0.7rem;">Total Tagihan</span>
+          <strong class="text-dark" id="dashTotalTagihan" style="font-size: 0.85rem;">Rp 0</strong>
+        </div>
+        <div class="col-4 border-end">
+          <span class="text-muted d-block" style="font-size: 0.7rem;">Sudah Dibayar</span>
+          <strong class="text-success" id="dashTotalBayar" style="font-size: 0.85rem;">Rp 0</strong>
+        </div>
+        <div class="col-4">
+          <span class="text-muted d-block" style="font-size: 0.7rem;">Sisa Tagihan</span>
+          <strong class="text-danger" id="dashTotalSisa" style="font-size: 0.85rem;">Rp 0</strong>
+        </div>
+      </div>
+
+      <!-- RINGKASAN JUMLAH WP -->
+      <div class="row text-center g-2">
+        <div class="col-3 border-end">
+          <span class="text-muted d-block" style="font-size: 0.68rem;"><i class="fa-solid fa-circle-xmark text-danger"></i> Belum Bayar</span>
+          <strong class="text-danger badge-wp-count" id="wpCountBelum">0 WP</strong>
+        </div>
+        <div class="col-3 border-end">
+          <span class="text-muted d-block" style="font-size: 0.68rem;"><i class="fa-solid fa-circle-check text-success"></i> Lunas</span>
+          <strong class="text-success badge-wp-count" id="wpCountLunas">0 WP</strong>
+        </div>
+        <div class="col-3 border-end">
+          <span class="text-muted d-block" style="font-size: 0.68rem;"><i class="fa-solid fa-ban text-secondary"></i> Penghapusan</span>
+          <strong class="text-secondary badge-wp-count" id="wpCountPenghapusan">0 WP</strong>
+        </div>
+        <div class="col-3">
+          <span class="text-muted d-block" style="font-size: 0.68rem;"><i class="fa-solid fa-users text-primary"></i> Total WP</span>
+          <strong class="text-primary badge-wp-count" id="wpCountTotal">0 WP</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tombol Buka Modal Input Pembayaran -->
+    <div class="d-grid mb-3" id="containerBtnInput" style="display: none;">
+      <button class="btn btn-primary btn-sm fw-bold" onclick="bukaModalInput()">
+        <i class="fa-solid fa-plus-circle"></i> Input Pembayaran WP
+      </button>
+    </div>
+
+    <!-- Kotak Pencarian -->
+    <div class="input-group input-group-sm mb-2">
+      <span class="input-group-text"><i class="fa-solid fa-search"></i></span>
+      <input type="text" id="searchBox" class="form-control" placeholder="Cari Nama WP atau NOP..." onkeyup="filterData()">
+    </div>
+
+    <!-- Tombol Filter Status & Tahun & Download PDF -->
+    <div class="row g-2 mb-3 align-items-center">
+      <div class="col-12 col-sm-6">
+        <div class="d-flex gap-1 overflow-auto pb-1 h-100 align-items-center">
+          <button class="btn btn-dark filter-btn active" onclick="setFilter('Semua', this)">Semua</button>
+          <button class="btn btn-outline-danger filter-btn" onclick="setFilter('Belum Bayar', this)">Belum</button>
+          <button class="btn btn-outline-success filter-btn" onclick="setFilter('Lunas', this)">Lunas</button>
+          <button class="btn btn-outline-secondary filter-btn" onclick="setFilter('Penghapusan Pajak', this)">Penghapusan</button>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 d-flex gap-1">
+        <button class="btn btn-danger btn-sm filter-btn fw-bold text-nowrap" onclick="bukaModalPengesahanPDF()">
+          <i class="fa-solid fa-file-pdf"></i> Download PDF
+        </button>
+        <select id="filterTahun" class="form-select form-select-sm fw-bold text-secondary" onchange="filterData()">
+          <option value="Semua">Semua Tahun</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tabel Data WP -->
+    <div class="table-responsive">
+      <table class="table table-custom table-bordered table-striped mb-0">
+        <thead>
+          <tr>
+            <th class="text-center">No</th>
+            <th>Nama WP / NOP</th>
+            <th class="text-center">Tahun</th>
+            <th class="text-end">Tagihan</th>
+            <th class="text-end">Dibayar</th>
+            <th class="text-end">Sisa</th>
+            <th class="text-center">Tgl Setor</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody id="listWPTable">
+          <tr>
+            <td colspan="8" class="text-center py-4">
+              <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+              <span class="text-muted ms-2">Memuat data ...</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="text-center text-muted mt-4 mb-2" style="font-size: 0.75rem;">
+      &copy; 2026 Kecamatan Tabundung - aRL
+    </footer>
+  </div>
+
+  <!-- Modal Form Input Pembayaran Pajak -->
+  <div class="modal fade" id="modalInput" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h5 class="modal-title fs-6"><i class="fa-solid fa-receipt"></i> Input Pembayaran Pajak</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Selesai"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formBayar">
+            <div class="mb-2">
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Pilih Tahun Pembayaran</label>
+              <select id="inputPilihTahun" class="form-select form-select-sm fw-bold" onchange="handleTahunChange(this)" required>
+                <option value="">-- Pilih Tahun --</option>
+              </select>
+            </div>
+
+            <!-- Input Manual NOP (Ditempatkan di Atas Dropdown) -->
+            <div class="mb-2">
+              <label class="form-label mb-0" style="font-size: 0.75rem;"><i class="fa-solid fa-barcode text-primary"></i> Ketik NOP Secara Manual</label>
+              <input type="text" id="inputManualNOP" class="form-control form-control-sm fw-bold text-primary" placeholder="Masukkan NOP..." onkeyup="handleManualNOPInput(this)">
+              <div id="infoNamaWpManual" class="form-text text-primary fw-bold mt-1" style="font-size: 0.75rem; display: none;"></div>
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Atau Pilih Dari Daftar Wajib Pajak</label>
+              <select id="dropdownPilihWP" class="form-select form-select-sm" onchange="handleWPChange(this)">
+                <option value="">-- Pilih Tahun Terlebih Dahulu --</option>
+              </select>
+            </div>
+
+            <div id="formWPBaru" class="p-2 mb-2 border rounded bg-light" style="display: none;">
+              <p class="text-primary fw-bold mb-1" style="font-size: 0.75rem;"><i class="fa-solid fa-user-plus"></i> Tambah Data WP Baru</p>
+              <div class="mb-1">
+                <label class="form-label mb-0" style="font-size: 0.75rem;">Nomor NOP Baru</label>
+                <input type="text" id="inputNOPBaru" class="form-control form-control-sm" placeholder="Masukkan NOP...">
+              </div>
+              <div class="mb-1">
+                <label class="form-label mb-0" style="font-size: 0.75rem;">Nama Wajib Pajak Baru</label>
+                <input type="text" id="inputNamaBaru" class="form-control form-control-sm" placeholder="Masukkan Nama WP...">
+              </div>
+              <div>
+                <label class="form-label mb-0" style="font-size: 0.75rem;">Total Tagihan (Rp)</label>
+                <input type="number" id="inputTagihanBaru" class="form-control form-control-sm" placeholder="Contoh: 250000">
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Jumlah Setoran (Rp)</label>
+              <input type="number" id="jumlahBayar" class="form-control form-control-sm fw-bold text-success" placeholder="Contoh: 150000" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label mb-1" style="font-size: 0.75rem;">Tanggal Setoran</label>
+              <input type="date" id="tglSetor" class="form-control form-control-sm" required>
+            </div>
+
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-success btn-sm fw-bold" id="btnSimpan">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                Selesai Input (Tutup)
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Parameter Pengesahan Cetak PDF -->
+  <div class="modal fade" id="modalPengesahanPDF" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header py-2 bg-danger text-white">
+          <h5 class="modal-title fs-6"><i class="fa-solid fa-file-pdf"></i> Pengesahan Cetak Laporan PDF</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Batal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="formPengesahanPDF">
+            <div class="mb-2">
+              <label class="form-label mb-0" style="font-size: 0.75rem;">Nama Desa / Rekapitulasi</label>
+              <input type="text" id="pdfNamaDesa" class="form-control form-control-sm fw-bold" readonly>
+            </div>
+            <div class="mb-2">
+              <label class="form-label mb-0" style="font-size: 0.75rem;">Tanggal Cetak Laporan</label>
+              <input type="date" id="pdfTglCetak" class="form-control form-control-sm" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label mb-0" style="font-size: 0.75rem;">Nama Operator Desa</label>
+              <input type="text" id="pdfNamaOperator" class="form-control form-control-sm" placeholder="Nama Petugas / Operator..." required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label mb-0" style="font-size: 0.75rem;">Nama Kepala Desa</label>
+              <input type="text" id="pdfNamaKades" class="form-control form-control-sm" placeholder="Nama Kepala Desa..." required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label mb-0" style="font-size: 0.75rem;">Nama Camat Tabundung</label>
+              <input type="text" id="pdfNamaCamat" class="form-control form-control-sm" placeholder="Nama Camat Tabundung..." required>
+            </div>
+            <div class="d-grid gap-2">
+              <button type="button" class="btn btn-danger btn-sm fw-bold" onclick="prosesGeneratePDF()">
+                <i class="fa-solid fa-download"></i> Download PDF Sekarang
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const sesiOperator = typeof cekSesiOperator === 'function' ? cekSesiOperator() : { desa: 'Tabundung', username: 'operator' };
+
+    if (!sesiOperator) {
+      alert("Anda harus login terlebih dahulu!");
+      window.location.href = 'index.html';
+    }
+
+    const activeDesa = sesiOperator ? sesiOperator.desa : '';
+    const activeUsername = sesiOperator ? sesiOperator.username : '';
+    const isAdminKecamatan = (activeDesa.toLowerCase() === 'kecamatan' || activeDesa.toLowerCase() === 'admin');
+
+    const SUPABASE_URL = 'https://offeebouiohweqlgyccx.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mZmVlYm91aW9od2VxbGd5Y2N4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzMzEwOTYsImV4cCI6MjEwNjkwNzA5Nn0.IuJLePe6ZvPABvuSFVpwFjiM3TGiIH_4zah8fUvEfbw';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let globalData = [];
+    let currentFilteredDataForPDF = [];
+    let currentFilterStatus = 'Semua';
+
+    async function updateStatusKoneksi() {
+      const elStatus = document.getElementById('statusKoneksi');
+      const elAntrean = document.getElementById('badgeAntrean');
+
+      if (elStatus) {
+        if (navigator.onLine) {
+          elStatus.className = "badge bg-success";
+          elStatus.innerHTML = '<i class="fa-solid fa-wifi"></i> Online';
+        } else {
+          elStatus.className = "badge bg-warning text-dark";
+          elStatus.innerHTML = '<i class="fa-solid fa-plane-slash"></i> Offline';
+        }
+      }
+
+      if (elAntrean && typeof db !== 'undefined') {
+        try {
+          const jumlahAntrean = await db.antreanInput.where('status').equals('pending').count();
+          if (jumlahAntrean > 0) {
+            elAntrean.classList.remove('d-none');
+            elAntrean.innerText = `${jumlahAntrean} Data Belum Tersinkron`;
+          } else {
+            elAntrean.classList.add('d-none');
+          }
+        } catch (e) {
+          console.warn("Gagal membaca antrean:", e);
+        }
+      }
+    }
+
+    window.onload = function() {
+      updateStatusKoneksi();
+      window.addEventListener('online', updateStatusKoneksi);
+      window.addEventListener('offline', updateStatusKoneksi);
+
+      if (isAdminKecamatan) {
+        document.getElementById('textNamaDesaHeader').innerText = "Rekapitulasi Kecamatan Tabundung";
+        document.getElementById('containerPilihDesa').style.display = 'block';
+        document.getElementById('containerBtnInput').style.display = 'none';
+        let modalEl = document.getElementById('modalInput');
+        if (modalEl) modalEl.remove();
+      } else {
+        document.getElementById('textNamaDesaHeader').innerText = `Desa ${activeDesa} - Kecamatan Tabundung`;
+        document.getElementById('containerBtnInput').style.display = 'block';
+        document.getElementById('tglSetor').valueAsDate = new Date();
+      }
+
+      generateYearDropdowns();
+      loadData();
+    };
+
+    function generateYearDropdowns() {
+      let filterTahun = document.getElementById('filterTahun');
+      let inputTahun = document.getElementById('inputPilihTahun');
+      
+      let optionsFilter = '<option value="Semua">Semua Tahun</option>';
+      let optionsInput = '<option value="">-- Pilih Tahun --</option>';
+      
+      for (let y = 2026; y >= 2000; y--) {
+        optionsFilter += `<option value="${y}">Tahun ${y}</option>`;
+        optionsInput += `<option value="${y}">Tahun ${y}</option>`;
+      }
+      
+      filterTahun.innerHTML = optionsFilter;
+      if(inputTahun) inputTahun.innerHTML = optionsInput;
+    }
+
+    async function fetchTableDataInParallel(tableName) {
+      if (navigator.onLine && typeof supabaseClient !== 'undefined') {
+        try {
+          let step = 1000;
+          let query = supabaseClient.from(tableName).select('*', { count: 'exact' });
+
+          let filterDesa = activeDesa;
+          if (isAdminKecamatan) {
+            let selectedDesaAdmin = document.getElementById('selectDesaAdmin').value;
+            if (selectedDesaAdmin !== 'SEMUA') filterDesa = selectedDesaAdmin;
+          }
+
+          if (!isAdminKecamatan || (isAdminKecamatan && document.getElementById('selectDesaAdmin').value !== 'SEMUA')) {
+            query = query.eq('desa', filterDesa);
+          }
+
+          const { data: firstBatch, error: errFirst, count } = await query.range(0, step - 1);
+          if (errFirst) throw errFirst;
+
+          let allRecords = [...(firstBatch || [])];
+          let totalRecords = count || allRecords.length;
+
+          if (totalRecords > step) {
+            let promises = [];
+            for (let rangeStart = step; rangeStart < totalRecords; rangeStart += step) {
+              let nextQuery = supabaseClient.from(tableName).select('*');
+              if (!isAdminKecamatan || (isAdminKecamatan && document.getElementById('selectDesaAdmin').value !== 'SEMUA')) {
+                nextQuery = nextQuery.eq('desa', filterDesa);
+              }
+              promises.push(nextQuery.range(rangeStart, rangeStart + step - 1));
+            }
+
+            const results = await Promise.all(promises);
+            results.forEach(res => {
+              if (res.error) throw res.error;
+              if (res.data) allRecords = allRecords.concat(res.data);
+            });
+          }
+
+          if (tableName === 'wajib_pajak' && allRecords.length > 0 && typeof db !== 'undefined') {
+            await db.wajibPajak.clear();
+            await db.wajibPajak.bulkAdd(allRecords);
+          }
+
+          return allRecords;
+        } catch (err) {
+          console.warn(`Gagal mengambil ${tableName} dari Database Utama, membaca cadangan lokal...`, err);
+        }
+      }
+
+      if (typeof ambilDataDariLokal === 'function') {
+        return await ambilDataDariLokal(
+          isAdminKecamatan ? document.getElementById('selectDesaAdmin').value : activeDesa,
+          isAdminKecamatan
+        );
+      }
+      return [];
+    }
+
+    async function loadData() {
+      try {
+        let allWpList = await fetchTableDataInParallel('wajib_pajak');
+        let allBayarList = [];
+
+        if (navigator.onLine && typeof supabaseClient !== 'undefined') {
+          try {
+            allBayarList = await fetchTableDataInParallel('pembayaran_pajak');
+          } catch(e) {
+            console.warn("Membaca pembayaran dari lokal");
+          }
+        }
+
+        let petaBayar = {};
+        allBayarList.forEach(b => {
+          let key = `${String(b.nop).trim()}_${b.tahun_tagihan}`;
+          if (!petaBayar[key]) petaBayar[key] = { total: 0, tgl: '-' };
+          petaBayar[key].total += Number(b.jumlah_bayar) || 0;
+          if (b.tanggal_setor) petaBayar[key].tgl = b.tanggal_setor;
+        });
+
+        let counterPerTahun = {};
+
+        globalData = allWpList.map((wp) => {
+          let nop = String(wp.nop).trim();
+          let tahunStr = String(wp.tahun_tagihan);
+          let key = `${nop}_${tahunStr}`;
+          let totalTagihan = Number(wp.total_tagihan) || 0;
+          let jumlahBayar = petaBayar[key] ? petaBayar[key].total : (Number(wp.jumlah_bayar) || 0);
+          let tglSetor = petaBayar[key] ? petaBayar[key].tgl : (wp.tanggal_setor || '-');
+          let sisaTagihan = Math.max(0, totalTagihan - jumlahBayar);
+          
+          let status = "Belum Bayar";
+          if (totalTagihan === 0) status = "Penghapusan Pajak";
+          else if (jumlahBayar >= totalTagihan) status = "Lunas";
+
+          if (!counterPerTahun[tahunStr]) {
+            counterPerTahun[tahunStr] = 1;
+          } else {
+            counterPerTahun[tahunStr]++;
+          }
+
+          return {
+            no: counterPerTahun[tahunStr],
+            desa: wp.desa || '-',
+            nop: nop,
+            nama: wp.nama,
+            tahunTagihan: tahunStr,
+            totalTagihan: totalTagihan,
+            jumlahBayar: jumlahBayar,
+            sisaTagihan: sisaTagihan,
+            tanggalSetor: tglSetor,
+            status: status
+          };
+        });
+
+        filterData();
+      } catch (err) {
+        console.error("Gagal memuat data:", err);
+      }
+    }
+
+    function onChangeDesaAdmin() {
+      loadData();
+    }
+
+    function updateDashboard(dataToSummarize, labelTahun) {
+      let totalTagihan = 0;
+      let totalBayar = 0;
+
+      let countBelum = 0;
+      let countLunas = 0;
+      let countPenghapusan = 0;
+
+      dataToSummarize.forEach(item => {
+        totalTagihan += Number(item.totalTagihan) || 0;
+        totalBayar += Number(item.jumlahBayar) || 0;
+
+        if (item.status === 'Belum Bayar') countBelum++;
+        else if (item.status === 'Lunas') countLunas++;
+        else if (item.status === 'Penghapusan Pajak') countPenghapusan++;
+      });
+
+      let totalSisa = Math.max(0, totalTagihan - totalBayar);
+      let persentase = totalTagihan > 0 ? ((totalBayar / totalTagihan) * 100).toFixed(1) : 0;
+      let totalWP = dataToSummarize.length;
+
+      document.getElementById('dashLabelTahun').innerText = labelTahun;
+      document.getElementById('dashPersen').innerText = persentase + '%';
+      document.getElementById('dashProgressBar').style.width = persentase + '%';
+      document.getElementById('dashTotalTagihan').innerText = 'Rp ' + totalTagihan.toLocaleString('id-ID');
+      document.getElementById('dashTotalBayar').innerText = 'Rp ' + totalBayar.toLocaleString('id-ID');
+      document.getElementById('dashTotalSisa').innerText = 'Rp ' + totalSisa.toLocaleString('id-ID');
+
+      document.getElementById('wpCountBelum').innerText = countBelum.toLocaleString('id-ID') + ' WP';
+      document.getElementById('wpCountLunas').innerText = countLunas.toLocaleString('id-ID') + ' WP';
+      document.getElementById('wpCountPenghapusan').innerText = countPenghapusan.toLocaleString('id-ID') + ' WP';
+      document.getElementById('wpCountTotal').innerText = totalWP.toLocaleString('id-ID') + ' WP';
+    }
+
+    function setFilter(status, btnElement) {
+      currentFilterStatus = status;
+      btnElement.parentElement.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('btn-dark', 'btn-danger', 'btn-success', 'btn-secondary');
+        if(btn.textContent === 'Semua') btn.className = 'btn btn-outline-dark filter-btn';
+        else if(btn.textContent === 'Belum') btn.className = 'btn btn-outline-danger filter-btn';
+        else if(btn.textContent === 'Lunas') btn.className = 'btn btn-outline-success filter-btn';
+        else if(btn.textContent === 'Penghapusan') btn.className = 'btn btn-outline-secondary filter-btn';
+      });
+      
+      if(status === 'Semua') btnElement.className = 'btn btn-dark filter-btn active';
+      else if(status === 'Belum Bayar') btnElement.className = 'btn btn-danger filter-btn active';
+      else if(status === 'Lunas') btnElement.className = 'btn btn-success filter-btn active';
+      else if(status === 'Penghapusan Pajak') btnElement.className = 'btn btn-secondary filter-btn active';
+
+      filterData();
+    }
+
+    /* RENDER TABEL HTML: NAMA WP DULU, NOP DI BAWAHNYA */
+    function renderList(data) {
+      let tbody = document.getElementById('listWPTable');
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">Tidak ada data Wajib Pajak yang ditemukan.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      data.forEach(item => {
+        let badgeColor = 'bg-danger';
+        if (item.status === 'Lunas') badgeColor = 'bg-success';
+        else if (item.status === 'Penghapusan Pajak') badgeColor = 'bg-secondary';
+        
+        html += `
+          <tr>
+            <td class="text-center">${item.no}</td>
+            <td>
+              <div class="fw-bold text-dark">${item.nama}</div>
+              <small class="text-muted d-block" style="font-size: 0.72rem;">NOP: ${item.nop} ${isAdminKecamatan ? ' | Desa: ' + item.desa : ''}</small>
+            </td>
+            <td class="text-center text-nowrap fw-semibold">${item.tahunTagihan}</td>
+            <td class="text-end text-nowrap">Rp ${item.totalTagihan.toLocaleString('id-ID')}</td>
+            <td class="text-end text-nowrap text-success fw-bold">Rp ${item.jumlahBayar.toLocaleString('id-ID')}</td>
+            <td class="text-end text-nowrap text-danger">Rp ${item.sisaTagihan.toLocaleString('id-ID')}</td>
+            <td class="text-center text-nowrap"><small>${item.tanggalSetor}</small></td>
+            <td class="text-center text-nowrap">
+              <span class="badge ${badgeColor}" style="font-size: 0.65rem;">${item.status}</span>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function filterData() {
+      let keyword = document.getElementById('searchBox').value.toLowerCase();
+      let selectedYear = document.getElementById('filterTahun').value;
+      
+      let dataByYear = globalData.filter(item => {
+        return (selectedYear === 'Semua') || (String(item.tahunTagihan) === selectedYear);
+      });
+
+      updateDashboard(dataByYear, selectedYear === 'Semua' ? 'Semua Tahun' : 'Tahun ' + selectedYear);
+
+      let filteredFinal = dataByYear.filter(item => {
+        let matchKeyword = String(item.nop).toLowerCase().includes(keyword) || 
+                           item.nama.toLowerCase().includes(keyword) ||
+                           String(item.desa).toLowerCase().includes(keyword) ||
+                           String(item.tahunTagihan).toLowerCase().includes(keyword) ||
+                           String(item.no).toLowerCase().includes(keyword);
+        
+        let matchStatus = (currentFilterStatus === 'Semua') || (item.status === currentFilterStatus);
+
+        return matchKeyword && matchStatus;
+      });
+
+      currentFilteredDataForPDF = filteredFinal;
+      renderList(filteredFinal);
+    }
+
+    /* MODAL PENGESAHAN & GENERATE PDF */
+    function bukaModalPengesahanPDF() {
+      if (currentFilteredDataForPDF.length === 0) {
+        alert("Tidak ada data yang tersedia untuk dicetak.");
+        return;
+      }
+
+      let namaDesaJudul = isAdminKecamatan 
+        ? (document.getElementById('selectDesaAdmin').value === 'SEMUA' ? 'Kecamatan Tabundung (Semua Desa)' : 'Desa ' + document.getElementById('selectDesaAdmin').value)
+        : 'Desa ' + activeDesa;
+
+      document.getElementById('pdfNamaDesa').value = namaDesaJudul;
+      document.getElementById('pdfTglCetak').valueAsDate = new Date();
+      
+      let modal = new bootstrap.Modal(document.getElementById('modalPengesahanPDF'));
+      modal.show();
+    }
+
+    function formatTanggalIndo(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      const bulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      return `${d.getDate()} ${bulan[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    function prosesGeneratePDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+      const desaVal = document.getElementById('pdfNamaDesa').value;
+      const tglCetakVal = formatTanggalIndo(document.getElementById('pdfTglCetak').value);
+      const operatorVal = document.getElementById('pdfNamaOperator').value.trim();
+      const kadesVal = document.getElementById('pdfNamaKades').value.trim();
+      const camatVal = document.getElementById('pdfNamaCamat').value.trim();
+      const tahunVal = document.getElementById('filterTahun').value;
+
+      if (!operatorVal || !kadesVal || !camatVal) {
+        alert("Harap isi semua nama penandatangan / pengesahan!");
+        return;
+      }
+
+      // KOP LAPORAN
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("PEMERINTAH KABUPATEN SUMBA TIMUR", 105, 14, { align: "center" });
+      doc.setFontSize(12);
+      doc.text("KECAMATAN TABUNDUNG", 105, 20, { align: "center" });
+      doc.setFontSize(11);
+      doc.text(`LAPORAN MONITORING PAJAK PBB-P2 (${desaVal.toUpperCase()})`, 105, 26, { align: "center" });
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Filter Tahun Tagihan: ${tahunVal === 'Semua' ? 'Semua Tahun' : 'Tahun ' + tahunVal}`, 105, 31, { align: "center" });
+
+      doc.setLineWidth(0.5);
+      doc.line(14, 34, 196, 34);
+
+      let totalTagihanSum = 0;
+      let totalBayarSum = 0;
+      let countBelum = 0;
+      let countLunas = 0;
+      let countPenghapusan = 0;
+
+      currentFilteredDataForPDF.forEach(item => {
+        totalTagihanSum += Number(item.totalTagihan) || 0;
+        totalBayarSum += Number(item.jumlahBayar) || 0;
+
+        if (item.status === 'Belum Bayar') countBelum++;
+        else if (item.status === 'Lunas') countLunas++;
+        else if (item.status === 'Penghapusan Pajak') countPenghapusan++;
+      });
+
+      let totalSisaSum = Math.max(0, totalTagihanSum - totalBayarSum);
+      let persentaseBayar = totalTagihanSum > 0 ? ((totalBayarSum / totalTagihanSum) * 100).toFixed(1) : "0.0";
+      let totalWpSum = currentFilteredDataForPDF.length;
+
+      const summaryHead = [
+        [{ content: 'RINGKASAN PROGRES REALISASI PAJAK PBB-P2', colSpan: 4, styles: { halign: 'center', fillColor: [220, 224, 230], textColor: [30, 30, 30], fontStyle: 'bold' } }]
+      ];
+
+      const summaryBody = [
+        [
+          `Total Tagihan: Rp ${totalTagihanSum.toLocaleString('id-ID')}`,
+          `Jumlah Bayar: Rp ${totalBayarSum.toLocaleString('id-ID')}`,
+          `Sisa Tagihan: Rp ${totalSisaSum.toLocaleString('id-ID')}`,
+          `Persentase: ${persentaseBayar}%`
+        ],
+        [
+          `Total WP: ${totalWpSum.toLocaleString('id-ID')} WP`,
+          `Belum Bayar: ${countBelum.toLocaleString('id-ID')} WP`,
+          `Lunas: ${countLunas.toLocaleString('id-ID')} WP`,
+          `Penghapusan: ${countPenghapusan.toLocaleString('id-ID')} WP`
+        ]
+      ];
+
+      doc.autoTable({
+        startY: 37,
+        head: summaryHead,
+        body: summaryBody,
+        theme: 'grid',
+        bodyStyles: { fontSize: 8, fontStyle: 'bold', halign: 'center' },
+        margin: { left: 14, right: 14 }
+      });
+
+      const tableData = currentFilteredDataForPDF.map((item, index) => [
+        index + 1,
+        `${item.nama}\nNOP: ${item.nop}`,
+        item.tahunTagihan,
+        `Rp ${item.totalTagihan.toLocaleString('id-ID')}`,
+        item.status
+      ]);
+
+      doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 5,
+        head: [['No', 'Nama WP / NOP', 'Tahun', 'Tagihan', 'Status']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [13, 110, 253], textColor: 255, halign: 'center', fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 12 },
+          1: { halign: 'left' },
+          2: { halign: 'center', cellWidth: 20 },
+          3: { halign: 'right', cellWidth: 35 },
+          4: { halign: 'center', cellWidth: 30 }
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      let finalY = doc.lastAutoTable.finalY + 10;
+
+      if (finalY > 230) {
+        doc.addPage();
+        finalY = 20;
+      }
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+
+      doc.text(`Tabundung, ${tglCetakVal}`, 196, finalY, { align: "right" });
+      finalY += 6;
+
+      const col1X = 14;   // Operator Desa
+      const col2X = 105;  // Kepala Desa
+      const col3X = 196;  // Camat Tabundung
+
+      doc.text("Dibuat oleh:,", col1X, finalY);
+      doc.text("Menyetujui,", col2X, finalY, { align: "center" });
+      doc.text("Mengesahkan,", col3X, finalY, { align: "right" });
+
+      finalY += 5;
+      doc.text("Operator Desa,", col1X, finalY);
+      doc.text("Kepala Desa,", col2X, finalY, { align: "center" });
+      doc.text("Camat Tabundung,", col3X, finalY, { align: "right" });
+
+      finalY += 22;
+
+      doc.setFont("helvetica", "bold");
+      doc.text(operatorVal, col1X, finalY);
+      doc.text(kadesVal, col2X, finalY, { align: "center" });
+      doc.text(camatVal, col3X, finalY, { align: "right" });
+
+      doc.save(`Laporan_PBB_P2_${desaVal.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
+
+      let modalEl = document.getElementById('modalPengesahanPDF');
+      let modal = bootstrap.Modal.getInstance(modalEl);
+      if(modal) modal.hide();
+    }
+
+    if (!isAdminKecamatan) {
+      function bukaModalInput() {
+        document.getElementById('formBayar').reset();
+        document.getElementById('formWPBaru').style.display = 'none';
+        document.getElementById('infoNamaWpManual').style.display = 'none';
+        document.getElementById('tglSetor').valueAsDate = new Date();
+        let modal = new bootstrap.Modal(document.getElementById('modalInput'));
+        modal.show();
+      }
+
+      function handleTahunChange(selectElement) {
+        let tahunPilihan = selectElement.value;
+        let dropdownWP = document.getElementById('dropdownPilihWP');
+        document.getElementById('inputManualNOP').value = '';
+        document.getElementById('infoNamaWpManual').style.display = 'none';
+        document.getElementById('formWPBaru').style.display = 'none';
+        document.getElementById('jumlahBayar').value = '';
+        
+        if (!tahunPilihan) {
+          dropdownWP.innerHTML = '<option value="">-- Pilih Tahun Terlebih Dahulu --</option>';
+          return;
+        }
+
+        let filteredWP = globalData.filter(item => String(item.tahunTagihan) === tahunPilihan);
+        
+        let options = '<option value="">-- Pilih Wajib Pajak --</option>';
+        options += `<option value="BARU" class="fw-bold text-primary">➕ [ + Tambah Wajib Pajak Baru ]</option>`;
+        
+        filteredWP.forEach(item => {
+          options += `<option value="${item.nop}" data-sisa="${item.sisaTagihan}">[${item.nama}] - NOP: ${item.nop} (${item.status} | Sisa: Rp ${item.sisaTagihan.toLocaleString('id-ID')})</option>`;
+        });
+        dropdownWP.innerHTML = options;
+      }
+
+      function handleWPChange(selectElement) {
+        let formBaru = document.getElementById('formWPBaru');
+        let inputJumlahBayar = document.getElementById('jumlahBayar');
+        let inputManualNOP = document.getElementById('inputManualNOP');
+        let infoNamaWpManual = document.getElementById('infoNamaWpManual');
+
+        if(selectElement.value !== "") {
+          inputManualNOP.value = "";
+          infoNamaWpManual.style.display = 'none';
+        }
+
+        if (selectElement.value === 'BARU') {
+          formBaru.style.display = 'block';
+          document.getElementById('inputNOPBaru').required = true;
+          document.getElementById('inputNamaBaru').required = true;
+          document.getElementById('inputTagihanBaru').required = true;
+          inputJumlahBayar.value = '';
+        } else {
+          formBaru.style.display = 'none';
+          document.getElementById('inputNOPBaru').required = false;
+          document.getElementById('inputNamaBaru').required = false;
+          document.getElementById('inputTagihanBaru').required = false;
+
+          let selectedOption = selectElement.options[selectElement.selectedIndex];
+          let sisaTagihan = selectedOption.getAttribute('data-sisa');
+          if (sisaTagihan !== null) {
+            inputJumlahBayar.value = sisaTagihan;
+          } else {
+            inputJumlahBayar.value = '';
+          }
+        }
+      }
+
+      /* ========================================================= */
+      /*  REALTIME NOP INPUT: OPERATOR LANGSUNG BISA SIMPAN        */
+      /* ========================================================= */
+      function handleManualNOPInput(inputElement) {
+        let manualNop = inputElement.value.trim();
+        let dropdownWP = document.getElementById('dropdownPilihWP');
+        let formBaru = document.getElementById('formWPBaru');
+        let inputJumlahBayar = document.getElementById('jumlahBayar');
+        let infoNamaWpManual = document.getElementById('infoNamaWpManual');
+        let tahunPilihan = document.getElementById('inputPilihTahun').value;
+
+        if (manualNop.length > 0) {
+          dropdownWP.value = ""; // Reset dropdown agar tidak bentrok
+          formBaru.style.display = 'none';
+
+          // Cari data WP berdasarkan NOP dan Tahun Tagihan
+          let found = globalData.find(item => String(item.nop).trim().toLowerCase() === manualNop.toLowerCase() && String(item.tahunTagihan) === tahunPilihan);
+          
+          if (found) {
+            if (!inputJumlahBayar.value || inputJumlahBayar.value == found.sisaTagihan) {
+              inputJumlahBayar.value = found.sisaTagihan;
+            }
+            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-check text-success"></i> WP: <strong>${found.nama}</strong> | Tagihan: Rp ${Number(found.totalTagihan).toLocaleString('id-ID')} | Sisa: Rp ${Number(found.sisaTagihan).toLocaleString('id-ID')}`;
+            infoNamaWpManual.style.display = 'block';
+
+            document.getElementById('inputNOPBaru').required = false;
+            document.getElementById('inputNamaBaru').required = false;
+            document.getElementById('inputTagihanBaru').required = false;
+          } else {
+            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-info text-warning"></i> NOP belum terdaftar. Isi data WP baru di bawah untuk mendaftarkannya.`;
+            infoNamaWpManual.style.display = 'block';
+            formBaru.style.display = 'block';
+            document.getElementById('inputNOPBaru').value = manualNop;
+            document.getElementById('inputNOPBaru').required = true;
+            document.getElementById('inputNamaBaru').required = true;
+            document.getElementById('inputTagihanBaru').required = true;
+          }
+        } else {
+          infoNamaWpManual.style.display = 'none';
+          formBaru.style.display = 'none';
+        }
+      }
+
+      /* ========================================================= */
+      /*  SUBMIT HANDLER FORM SIMPAN PEMBAYARAN                    */
+      /* ========================================================= */
+      document.getElementById('formBayar').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        let tahunTagihan = Number(document.getElementById('inputPilihTahun').value);
+        let pilihanWP = document.getElementById('dropdownPilihWP').value;
+        let manualNOP = document.getElementById('inputManualNOP').value.trim();
+        let jumlah = Number(document.getElementById('jumlahBayar').value);
+        let tanggal = document.getElementById('tglSetor').value;
+        
+        // Utama: Ambil dari NOP Manual jika diisi, atau dari pilihan dropdown
+        let nopWP = manualNOP || (pilihanWP !== 'BARU' ? pilihanWP : document.getElementById('inputNOPBaru').value.trim());
+        let namaWP = document.getElementById('inputNamaBaru').value.trim();
+        let totalTagihanBaru = Number(document.getElementById('inputTagihanBaru').value);
+
+        let btn = document.getElementById('btnSimpan');
+        if(!tahunTagihan || !nopWP) {
+          alert("Silakan pilih Tahun dan isi NOP atau Pilih Wajib Pajak!");
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = 'Menyimpan...';
+
+        try {
+          let formBaruVisible = document.getElementById('formWPBaru').style.display !== 'none';
+          
+          if ((pilihanWP === 'BARU' || (manualNOP && formBaruVisible)) && typeof tambahDataWP === 'function') {
+            let payloadBaru = {
+              nop: nopWP, 
+              nama: namaWP || 'Wajib Pajak Baru', 
+              tahun_tagihan: tahunTagihan, 
+              total_tagihan: totalTagihanBaru || jumlah,
+              desa: activeDesa
+            };
+            await tambahDataWP(payloadBaru);
+          }
+
+          let payloadBayar = { 
+            nop: nopWP, 
+            tahun_tagihan: tahunTagihan, 
+            jumlah_bayar: jumlah, 
+            tanggal_setor: tanggal,
+            desa: activeDesa 
+          };
+
+          let hasil = { mode: 'online' };
+          if (typeof tambahDataWP === 'function') {
+            hasil = await tambahDataWP(payloadBayar);
+          }
+
+          if (hasil.mode === 'online') {
+            alert(`✅ Data pembayaran NOP ${nopWP} (${activeDesa}) berhasil disimpan!`);
+          } else {
+            alert(`📲 Mode Offline: Data pembayaran NOP ${nopWP} tersimpan lokal dan akan otomatis disinkronkan saat ada internet.`);
+          }
+
+          let lastTahun = document.getElementById('inputPilihTahun').value;
+          let lastTanggal = document.getElementById('tglSetor').value;
+
+          document.getElementById('formBayar').reset();
+          document.getElementById('inputPilihTahun').value = lastTahun;
+          document.getElementById('tglSetor').value = lastTanggal;
+          
+          document.getElementById('formWPBaru').style.display = 'none';
+          document.getElementById('infoNamaWpManual').style.display = 'none';
+          
+          await loadData();
+          handleTahunChange(document.getElementById('inputPilihTahun'));
+          document.getElementById('inputManualNOP').focus();
+
+        } catch (err) {
+          alert("❌ Gagal menyimpan data: " + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Pembayaran';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
