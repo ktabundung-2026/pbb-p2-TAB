@@ -149,6 +149,10 @@ async function simpanOffline(dataBaru) {
     await db.pembayaranPajak.add(dataBaru);
   }
 
+  if (typeof updateStatusKoneksi === 'function') {
+    updateStatusKoneksi();
+  }
+
   return { success: true, mode: 'offline' };
 }
 
@@ -188,6 +192,9 @@ window.addEventListener('online', async () => {
         }
       }
 
+      if (typeof updateStatusKoneksi === 'function') {
+        updateStatusKoneksi();
+      }
       if (typeof loadData === 'function') {
         loadData();
       }
