@@ -927,47 +927,70 @@
       }
 
       /* ========================================================= */
-      /*  REALTIME INPUT NOP MANUAL: LANGSUNG DAPAT DISIMPAN        */
-      /* ========================================================= */
-      function handleManualNOPInput(inputElement) {
-        let manualNop = inputElement.value.trim();
-        let dropdownWP = document.getElementById('dropdownPilihWP');
-        let formBaru = document.getElementById('formWPBaru');
-        let inputJumlahBayar = document.getElementById('jumlahBayar');
-        let infoNamaWpManual = document.getElementById('infoNamaWpManual');
-        let tahunPilihan = document.getElementById('inputPilihTahun').value;
+/*  REALTIME INPUT NOP MANUAL: KHUSUS PERBAIKAN PENCARIAN NOP  */
+/* ========================================================= */
+function handleManualNOPInput(inputElement) {
+  let manualNop = inputElement.value.trim();
+  let dropdownWP = document.getElementById('dropdownPilihWP');
+  let formBaru = document.getElementById('formWPBaru');
+  let inputJumlahBayar = document.getElementById('jumlahBayar');
+  let infoNamaWpManual = document.getElementById('infoNamaWpManual');
+  let tahunPilihan = document.getElementById('inputPilihTahun').value;
 
-        if (manualNop.length > 0) {
-          dropdownWP.value = ""; // Kosongkan nilai dropdown agar fokus pada pengisian NOP manual
-          formBaru.style.display = 'none';
+  if (manualNop.length > 0) {
+    dropdownWP.value = "";
+    formBaru.style.display = 'none';
 
-          // Cari data WP berdasarkan NOP dan Tahun Tagihan
-          let found = globalData.find(item => String(item.nop).trim().toLowerCase() === manualNop.toLowerCase() && String(item.tahunTagihan) === tahunPilihan);
-          
-          if (found) {
-            if (!inputJumlahBayar.value || inputJumlahBayar.value == found.sisaTagihan) {
-              inputJumlahBayar.value = found.sisaTagihan;
-            }
-            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-check text-success"></i> WP: <strong>${found.nama}</strong><br><small class="text-secondary">Tagihan: Rp ${Number(found.totalTagihan).toLocaleString('id-ID')} | Sisa: Rp ${Number(found.sisaTagihan).toLocaleString('id-ID')}</small>`;
-            infoNamaWpManual.style.display = 'block';
+    // Cari WP berdasarkan NOP presisi ATAU pencocokan 6 digit terakhir NOP
+    let matches = globalData.filter(item => {
+      let isSameYear = String(item.tahunTagihan) === tahunPilihan;
+      let cleanNop = String(item.nop).trim().toLowerCase();
+      let inputVal = manualNop.toLowerCase();
 
-            document.getElementById('inputNOPBaru').required = false;
-            document.getElementById('inputNamaBaru').required = false;
-            document.getElementById('inputTagihanBaru').required = false;
-          } else {
-            infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-info text-warning"></i> NOP belum terdaftar. Silakan isi data WP baru di bawah ini.`;
-            infoNamaWpManual.style.display = 'block';
-            formBaru.style.display = 'block';
-            document.getElementById('inputNOPBaru').value = manualNop;
-            document.getElementById('inputNOPBaru').required = true;
-            document.getElementById('inputNamaBaru').required = true;
-            document.getElementById('inputTagihanBaru').required = true;
-          }
-        } else {
-          infoNamaWpManual.style.display = 'none';
-          formBaru.style.display = 'none';
-        }
+      let isExactMatch = cleanNop === inputVal;
+      let isSuffixMatch = cleanNop.endsWith(inputVal) && inputVal.length >= 6;
+
+      return isSameYear && (isExactMatch || isSuffixMatch);
+    });
+
+    if (matches.length === 1) {
+      let found = matches[0];
+      
+      if (!inputJumlahBayar.value || inputJumlahBayar.value == found.sisaTagihan) {
+        inputJumlahBayar.value = found.sisaTagihan;
       }
+
+      // Menampilkan Nama WP dan SELURUH DIGIT NOP LENGKAP
+      infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-check text-success"></i> WP: <strong>${found.nama.toUpperCase()}</strong><br><small class="text-dark fw-bold">NOP Lengkap: ${found.nop}</small><br><small class="text-secondary">Tagihan: Rp ${Number(found.totalTagihan).toLocaleString('id-ID')} | Sisa: Rp ${Number(found.sisaTagihan).toLocaleString('id-ID')}</small>`;
+      infoNamaWpManual.style.display = 'block';
+
+      document.getElementById('inputNOPBaru').required = false;
+      document.getElementById('inputNamaBaru').required = false;
+      document.getElementById('inputTagihanBaru').required = false;
+
+    } else if (matches.length > 1) {
+      // Jika 6 digit terakhir menghasilkan lebih dari 1 NOP
+      let listNOP = matches.map(m => `${m.nama} (${m.nop})`).join(', ');
+      infoNamaWpManual.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-warning"></i> Ditemukan ${matches.length} NOP berakhiran '${manualNop}'. Harap perpanjang digit NOP.<br><small class="text-muted">Hasil: ${listNOP}</small>`;
+      infoNamaWpManual.style.display = 'block';
+      formBaru.style.display = 'none';
+
+    } else {
+      // NOP tidak ditemukan
+      infoNamaWpManual.innerHTML = `<i class="fa-solid fa-circle-info text-warning"></i> NOP belum terdaftar. Silakan isi data WP baru di bawah ini.`;
+      infoNamaWpManual.style.display = 'block';
+      formBaru.style.display = 'block';
+      
+      document.getElementById('inputNOPBaru').value = manualNop;
+      document.getElementById('inputNOPBaru').required = true;
+      document.getElementById('inputNamaBaru').required = true;
+      document.getElementById('inputTagihanBaru').required = true;
+    }
+  } else {
+    infoNamaWpManual.style.display = 'none';
+    formBaru.style.display = 'none';
+  }
+}
 
       /* ========================================================= */
       /*  SUBMIT HANDLER FORM SIMPAN PEMBAYARAN                    */
