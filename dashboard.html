@@ -102,9 +102,13 @@
       <h6 class="fw-bold text-dark mb-1" id="textNamaDesaHeader">Kecamatan Tabundung</h6>
       
       <!-- BADGE STATUS KONEKSI & ANTREAN SYNC OFFLINE -->
-      <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
-        <span id="statusKoneksi" class="badge bg-secondary" style="font-size: 0.7rem;">Mengecek koneksi...</span>
-        <span id="badgeAntrean" class="badge bg-warning text-dark d-none" style="font-size: 0.7rem;">0 Data Pending</span>
+      <div class="d-flex flex-column align-items-center gap-1 mt-2">
+        <div class="d-flex justify-content-center align-items-center gap-2">
+          <span id="statusKoneksi" class="badge bg-secondary" style="font-size: 0.7rem;">Mengecek koneksi...</span>
+          <span id="badgeAntrean" class="badge bg-warning text-dark d-none" style="font-size: 0.7rem;">0 Data Pending</span>
+        </div>
+        <!-- Rincian Informasi Desa untuk Data Pending -->
+        <div id="infoDesaPending" class="text-danger fw-bold d-none" style="font-size: 0.72rem;"></div>
       </div>
 
       <!-- DROPDOWN PILIH DESA KHUSUS ADMIN KECAMATAN -->
@@ -378,12 +382,16 @@
     let globalData = [];
     let currentFilteredDataForPDF = [];
     let currentFilterStatus = 'Semua';
-    let selectedFullNOP = '';  // Penampung NOP Lengkap hasil pencarian
-    let selectedFullNama = ''; // Penampung Nama WP Lengkap hasil pencarian
+    let selectedFullNOP = '';  
+    let selectedFullNama = ''; 
 
+    /* ========================================================= */
+    /*   MEMPERBARUI ANTREAN OFFLINE BESERTA NAMA DESANYA       */
+    /* ========================================================= */
     async function updateStatusKoneksi() {
       const elStatus = document.getElementById('statusKoneksi');
       const elAntrean = document.getElementById('badgeAntrean');
+      const elInfoDesa = document.getElementById('infoDesaPending');
 
       if (elStatus) {
         if (navigator.onLine) {
@@ -397,12 +405,32 @@
 
       if (elAntrean && typeof db !== 'undefined') {
         try {
-          const jumlahAntrean = await db.antreanInput.where('status').equals('pending').count();
+          const antreanList = await db.antreanInput.where('status').equals('pending').toArray();
+          const jumlahAntrean = antreanList.length;
+
           if (jumlahAntrean > 0) {
             elAntrean.classList.remove('d-none');
             elAntrean.innerText = `${jumlahAntrean} Data Belum Tersinkron`;
+
+            // Kelompokkan jumlah data berdasarkan nama desa
+            const rekapDesa = {};
+            antreanList.forEach(item => {
+              const d = item.desa || 'Tidak Diketahui';
+              rekapDesa[d] = (rekapDesa[d] || 0) + 1;
+            });
+
+            // Susun teks rincian desa
+            const teksRincian = Object.keys(rekapDesa)
+              .map(desa => `${desa}: ${rekapDesa[desa]} data`)
+              .join(' | ');
+
+            if (elInfoDesa) {
+              elInfoDesa.classList.remove('d-none');
+              elInfoDesa.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Belum tersinkron (${teksRincian})`;
+            }
           } else {
             elAntrean.classList.add('d-none');
+            if (elInfoDesa) elInfoDesa.classList.add('d-none');
           }
         } catch (e) {
           console.warn("Gagal membaca antrean:", e);
@@ -935,7 +963,6 @@
         let infoNamaWpManual = document.getElementById('infoNamaWpManual');
         let tahunPilihan = document.getElementById('inputPilihTahun').value;
 
-        // Reset penampung setiap kali ada input karakter baru
         selectedFullNOP = '';
         selectedFullNama = '';
 
@@ -957,7 +984,6 @@
           if (matches.length === 1) {
             let found = matches[0];
             
-            // SIMPAN NOP DAN NAMA LENGKAP DARI DATABASE
             selectedFullNOP = found.nop;
             selectedFullNama = found.nama;
 
@@ -1020,10 +1046,8 @@
         let jumlah = Number(document.getElementById('jumlahBayar').value);
         let tanggal = document.getElementById('tglSetor').value;
         
-        // PRIORITASKAN NOP DAN NAMA LENGKAP HASIL PENCARIAN ATAL DROPDOWN
         let nopWP = selectedFullNOP || manualNOP || (pilihanWP !== 'BARU' ? pilihanWP : document.getElementById('inputNOPBaru').value.trim());
         
-        // Ambil Nama WP: dari penampung pencarian, input WP baru, atau teks dropdown
         let namaWPBaru = document.getElementById('inputNamaBaru').value.trim();
         let dropdownEl = document.getElementById('dropdownPilihWP');
         let selectedOptionText = pilihanWP && pilihanWP !== 'BARU' && dropdownEl.selectedIndex >= 0 ? dropdownEl.options[dropdownEl.selectedIndex].text.split('\n')[0] : '';
@@ -1067,7 +1091,6 @@
             hasil = await tambahDataWP(payloadBayar);
           }
 
-          // PESAN KONFIRMASI DENGAN NAMA WP, NOP LENGKAP, DAN DESA
           if (hasil.mode === 'online') {
             alert(`✅ Data pembayaran a.n. ${namaWP.toUpperCase()} (NOP: ${nopWP} - Desa ${activeDesa}) berhasil disimpan!`);
           } else {
