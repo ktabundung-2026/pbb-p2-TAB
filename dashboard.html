@@ -378,7 +378,8 @@
     let globalData = [];
     let currentFilteredDataForPDF = [];
     let currentFilterStatus = 'Semua';
-    let selectedFullNOP = ''; // Penampung NOP Lengkap hasil pencarian manual
+    let selectedFullNOP = '';  // Penampung NOP Lengkap hasil pencarian
+    let selectedFullNama = ''; // Penampung Nama WP Lengkap hasil pencarian
 
     async function updateStatusKoneksi() {
       const elStatus = document.getElementById('statusKoneksi');
@@ -857,6 +858,7 @@
         document.getElementById('infoNamaWpManual').style.display = 'none';
         document.getElementById('tglSetor').valueAsDate = new Date();
         selectedFullNOP = '';
+        selectedFullNama = '';
         let modal = new bootstrap.Modal(document.getElementById('modalInput'));
         modal.show();
       }
@@ -869,6 +871,7 @@
         document.getElementById('formWPBaru').style.display = 'none';
         document.getElementById('jumlahBayar').value = '';
         selectedFullNOP = '';
+        selectedFullNama = '';
         
         if (!tahunPilihan) {
           dropdownWP.innerHTML = '<option value="">-- Pilih Tahun Terlebih Dahulu --</option>';
@@ -896,6 +899,7 @@
           inputManualNOP.value = "";
           infoNamaWpManual.style.display = 'none';
           selectedFullNOP = '';
+          selectedFullNama = '';
         }
 
         if (selectElement.value === 'BARU') {
@@ -931,8 +935,9 @@
         let infoNamaWpManual = document.getElementById('infoNamaWpManual');
         let tahunPilihan = document.getElementById('inputPilihTahun').value;
 
-        // Reset penampung NOP lengkap setiap kali terjadi input baru
+        // Reset penampung setiap kali ada input karakter baru
         selectedFullNOP = '';
+        selectedFullNama = '';
 
         if (manualNop.length > 0) {
           dropdownWP.value = "";
@@ -952,8 +957,9 @@
           if (matches.length === 1) {
             let found = matches[0];
             
-            // SIMPAN NOP LENGKAP DARI DATABASE
+            // SIMPAN NOP DAN NAMA LENGKAP DARI DATABASE
             selectedFullNOP = found.nop;
+            selectedFullNama = found.nama;
 
             if (!inputJumlahBayar.value || inputJumlahBayar.value == found.sisaTagihan) {
               inputJumlahBayar.value = found.sisaTagihan;
@@ -1014,9 +1020,15 @@
         let jumlah = Number(document.getElementById('jumlahBayar').value);
         let tanggal = document.getElementById('tglSetor').value;
         
-        // PRIORITASKAN NOP LENGKAP HASIL PENCARIAN
+        // PRIORITASKAN NOP DAN NAMA LENGKAP HASIL PENCARIAN ATAL DROPDOWN
         let nopWP = selectedFullNOP || manualNOP || (pilihanWP !== 'BARU' ? pilihanWP : document.getElementById('inputNOPBaru').value.trim());
-        let namaWP = document.getElementById('inputNamaBaru').value.trim();
+        
+        // Ambil Nama WP: dari penampung pencarian, input WP baru, atau teks dropdown
+        let namaWPBaru = document.getElementById('inputNamaBaru').value.trim();
+        let dropdownEl = document.getElementById('dropdownPilihWP');
+        let selectedOptionText = pilihanWP && pilihanWP !== 'BARU' && dropdownEl.selectedIndex >= 0 ? dropdownEl.options[dropdownEl.selectedIndex].text.split('\n')[0] : '';
+        let namaWP = selectedFullNama || namaWPBaru || selectedOptionText || 'Wajib Pajak';
+
         let totalTagihanBaru = Number(document.getElementById('inputTagihanBaru').value);
 
         let btn = document.getElementById('btnSimpan');
@@ -1043,7 +1055,7 @@
           }
 
           let payloadBayar = { 
-            nop: nopWP, // NOP Lengkap yang tersimpan di database
+            nop: nopWP, 
             tahun_tagihan: tahunTagihan, 
             jumlah_bayar: jumlah, 
             tanggal_setor: tanggal,
@@ -1055,17 +1067,19 @@
             hasil = await tambahDataWP(payloadBayar);
           }
 
+          // PESAN KONFIRMASI DENGAN NAMA WP, NOP LENGKAP, DAN DESA
           if (hasil.mode === 'online') {
-            alert(`✅ Data pembayaran NOP ${nopWP} (${activeDesa}) berhasil disimpan!`);
+            alert(`✅ Data pembayaran a.n. ${namaWP.toUpperCase()} (NOP: ${nopWP} - Desa ${activeDesa}) berhasil disimpan!`);
           } else {
-            alert(`📲 Mode Offline: Data pembayaran NOP ${nopWP} tersimpan lokal dan akan otomatis disinkronkan saat ada internet.`);
+            alert(`📲 Mode Offline: Data pembayaran a.n. ${namaWP.toUpperCase()} (NOP: ${nopWP} - Desa ${activeDesa}) tersimpan lokal dan akan otomatis disinkronkan saat ada internet.`);
           }
 
           let lastTahun = document.getElementById('inputPilihTahun').value;
           let lastTanggal = document.getElementById('tglSetor').value;
 
           document.getElementById('formBayar').reset();
-          selectedFullNOP = ''; // Reset variabel penampung NOP
+          selectedFullNOP = ''; 
+          selectedFullNama = '';
           
           document.getElementById('inputPilihTahun').value = lastTahun;
           document.getElementById('tglSetor').value = lastTanggal;
